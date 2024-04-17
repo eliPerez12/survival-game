@@ -1,5 +1,9 @@
+use ncollide2d::na::Isometry;
+use ncollide2d::na::Unit;
 use ncollide2d::na::Vector2 as Vec2;
 use ncollide2d::na::Isometry2;
+use ncollide2d::pipeline::CollisionGroups;
+use ncollide2d::pipeline::GeometricQueryType;
 use ncollide2d::query::RayCast;
 use ncollide2d::shape::{Cuboid, ShapeHandle};
 use raylib::prelude::*;
@@ -27,7 +31,7 @@ impl Collider {
     pub fn new(pos: Vector2, size: Vector2) -> Self {
         Collider {
             shape: ShapeHandle::new(Cuboid::new(Vec2::from_raylib_vector2(size/2.0))),
-            isometry: Isometry2::new(Vec2::from_raylib_vector2(pos + size/2.0), -std::f32::consts::PI/2.0),
+            isometry: Isometry2::new(Vec2::from_raylib_vector2(pos), std::f32::consts::PI/2.0),
         }
     }
     
@@ -41,16 +45,19 @@ impl Collider {
         intersection.map(|intersection|  ray.ncollide_ray.point_at(intersection.toi).coords.to_raylib_vector2())
     }
 
+    
+
     pub fn draw(&self, d: &mut RaylibDrawHandle) {
         let top_left = self.get_top_left();
         let size = self.get_size();
+        let half_size = size/2.0;
         let rectangle = Rectangle {
-            x: top_left.x,
-            y: top_left.y,
+            x: top_left.x + half_size.x,
+            y: top_left.y + half_size.y,
             width: size.x,
             height: size.y
         };
-        d.draw_rectangle_pro(rectangle, Vector2::zero(), self.get_rotation().to_degrees(), Color::BLUE);
+        d.draw_rectangle_pro(rectangle, half_size, self.get_rotation().to_degrees(), Color::BLUE);
     }
 
     pub fn get_top_left(&self) -> Vector2 {
@@ -66,8 +73,13 @@ impl Collider {
     }
 
     pub fn get_rotation(&self) -> f32 {
-        self.isometry.rotation.re
+        self.isometry.rotation.angle()
     }
+
+    /// Set rotation of collider to angle in degrees.
+    pub fn set_rotation(&mut self, angle: f32) {
+        self.isometry.rotation = ncollide2d::na::UnitComplex::from_angle(angle.to_radians())
+    }   
 
     pub fn set_pos(&mut self, pos: Vector2) {
         self.isometry.translation.vector = Vec2::from_raylib_vector2(pos)
@@ -108,6 +120,7 @@ fn main() {
     let (mut rl, thread) = raylib::init()
         .size(640, 480)
         .title("Ray and Cuboid")
+        .vsync()
         .build();
 
     let mut cuboid_collider = Collider::new(
@@ -116,10 +129,18 @@ fn main() {
     );
 
     let ray = Ray::new(Vector2::new(50.0, 50.0), Vector2::new(1.0, 1.0), 1_000.0);
-   
+    let mut angle = 0.0;
+    // let mut world = ncollide2d::world::CollisionWorld::new(0.0);
+
+    // let mut object_handle = world.add(cuboid_collider.isometry, cuboid_collider.shape.clone(), CollisionGroups::new(), GeometricQueryType::Contacts(0.0, 0.0), 0.0);
+    // world.collision_objects_in_contact_with(object_handle.0);
+
+
     while !rl.window_should_close() {
 
         cuboid_collider.set_pos(rl.get_mouse_position());
+        angle += 120.0 * rl.get_frame_time();
+        cuboid_collider.set_rotation(angle);
 
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
