@@ -1,0 +1,82 @@
+use ncollide2d::na::{Isometry2, Translation2, Vector2 as Vec2};
+use ncollide2d::pipeline::{CollisionGroups, CollisionObjectSlabHandle, GeometricQueryType};
+use ncollide2d::shape::{Cuboid, ShapeHandle};
+use ncollide2d::world::CollisionWorld;
+use raylib::prelude::*;
+
+
+
+struct CuboidObject {
+    handle: CollisionObjectSlabHandle,
+    velocity: Vec2<f32>,
+}
+
+fn main() {
+    let (mut rl, thread) = raylib::init()
+        .size(640, 480)
+        .title("Ray and Cuboid")
+        .vsync()
+        .build();
+
+    let mut collision_world = CollisionWorld::new(0.0);
+    let cube = ShapeHandle::new(Cuboid::new(Vec2::new(50.0, 50.0)));
+    let cube1_handle = collision_world
+        .add(
+            Isometry2::new(Vec2::new(0.0, 0.0), 0.0),
+            cube.clone(),
+            CollisionGroups::new(),
+            GeometricQueryType::Contacts(0.0, 0.0),
+            (),
+        )
+        .0;
+    let cube2_handle = collision_world
+        .add(
+            Isometry2::new(Vec2::new(50.0, 50.0), 0.0),
+            cube,
+            CollisionGroups::new(),
+            GeometricQueryType::Contacts(0.0, 0.0),
+            (),
+        )
+        .0;
+
+    let mut cuboids = vec![
+        CuboidObject {
+            handle: cube1_handle,
+            velocity: Vec2::new(2.0, 0.0),
+        },
+        CuboidObject {
+            handle: cube2_handle,
+            velocity: Vec2::new(-1.5, 1.0),
+        },
+    ];
+
+    while !rl.window_should_close() {
+        collision_world.update();
+
+        let mut d = rl.begin_drawing(&thread);
+        d.clear_background(Color::BLACK);
+
+        for cuboid in &mut cuboids {
+            let object = collision_world.get_mut(cuboid.handle).unwrap();
+            let pos = *object.position();
+            let shape = object.shape();
+            let half_size = shape.aabb(&pos).half_extents();
+            
+            // Perform a swept shape query to calculate the exact time of impact
+            object.set_predicted_position(Some(pos));
+            
+            // Draw the cuboid
+            d.draw_rectangle_pro(
+                Rectangle {
+                    x: pos.translation.x - half_size.x,
+                    y: pos.translation.y - half_size.y,
+                    width: half_size.x * 2.0,
+                    height: half_size.y * 2.0,
+                },
+                Vector2::zero(),
+                pos.rotation.angle().to_degrees(),
+                Color::BLUE,
+            );
+        }
+    }
+}
