@@ -26,12 +26,14 @@ struct Cuboid {
 impl Cuboid {
     pub fn new(
         pos: Vector2,
+        vel: Vector2,
         half_extents: Vector2,
         rigid_body_set: &mut RigidBodySet,
         collider_set: &mut ColliderSet,
     ) -> Self {
         let rigid_body = RigidBodyBuilder::dynamic()
             .translation(rapier2d::na::Vector2::from_raylib_vector2(pos))
+            .linvel(rapier2d::na::Vector2::from_raylib_vector2(vel))
             .build();
         let collider = ColliderBuilder::cuboid(half_extents.x, half_extents.y)
             .restitution(0.7)
@@ -55,12 +57,14 @@ struct Ball {
 impl Ball {
     pub fn new(
         pos: Vector2,
+        vel: Vector2,
         radius: f32,
         rigid_body_set: &mut RigidBodySet,
         collider_set: &mut ColliderSet,
     ) -> Self {
         let rigid_body = RigidBodyBuilder::dynamic()
             .translation(rapier2d::na::Vector2::from_raylib_vector2(pos))
+            .linvel(rapier2d::na::Vector2::from_raylib_vector2(vel))
             .build();
         let collider = ColliderBuilder::ball(radius)
             .restitution(0.7)
@@ -144,13 +148,11 @@ impl CollisionWorld {
         while let Ok(collision_event) = self.collision_recv.try_recv() {
             // Handle the collision event.
             collisions.push(collision_event);
-            println!("Received collision event: {:?}", collision_event);
         }
 
         while let Ok(contact_force_event) = self.contact_force_recv.try_recv() {
             // Handle the collision event.
             contacts.push(contact_force_event);
-            println!("Received contact event: {:?}", contact_force_event);
         }
 
         (collisions, contacts)
@@ -163,9 +165,8 @@ fn main() {
         .title("Physics")
         .vsync()
         .build();
-
+    let mut camera = Camera2D::default();
     let mut collision_world = CollisionWorld::default();
-    /* Create the ground. */
     let ground_collider = ColliderBuilder::cuboid(1000.0, 0.1).build();
     let ground_rigid_body = RigidBodyBuilder::fixed()
         .translation(vector![0.0, 720.0])
@@ -186,6 +187,7 @@ fn main() {
             if rl.get_random_value::<i32>(0..2) == 1 {
                 balls.push(Ball::new(
                     Vector2::new(x as f32 * 21.0, y as f32 * 21.0),
+                    Vector2::zero(),
                     10.0,
                     &mut collision_world.rigid_body_set,
                     &mut collision_world.collider_set,
@@ -193,6 +195,7 @@ fn main() {
             } else {
                 cuboids.push(Cuboid::new(
                     Vector2::new(x as f32 * 21.0, y as f32 * 21.0),
+                    Vector2::zero(),
                     Vector2::new(10.0, 10.0),
                     &mut collision_world.rigid_body_set,
                     &mut collision_world.collider_set,
@@ -201,16 +204,31 @@ fn main() {
             
         }
     }
-    /* Create other structures necessary for the simulation. */
 
-    /* Run the game loop, stepping the simulation once per frame. */
     while !rl.window_should_close() {
-        let screen_size = Vector2::new(rl.get_screen_width() as f32, rl.get_screen_height() as f32);
-
+        /*
+         * Update
+         */
+        
+        if rl.is_key_down(KeyboardKey::KEY_W) {
+            camera.offset.y += 100.0 * rl.get_frame_time();
+        }
+        if rl.is_key_down(KeyboardKey::KEY_S) {
+            camera.offset.y -= 100.0 * rl.get_frame_time();
+        }
+        if rl.is_key_down(KeyboardKey::KEY_A) {
+            camera.offset.x += 100.0 * rl.get_frame_time();
+        }
+        if rl.is_key_down(KeyboardKey::KEY_D) {
+            camera.offset.x -= 100.0 * rl.get_frame_time();
+        }
         collision_world.integration_parameters.dt = rl.get_frame_time();
         collision_world.step();
         let collisions = collision_world.get_collisions();
 
+        /*
+         * Drawing
+         */
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
         for ball in &balls {
@@ -222,7 +240,7 @@ fn main() {
                 .as_ball()
                 .unwrap()
                 .radius;
-            d.draw_circle_v(pos, r, Color::BLUE);
+            d.draw_circle_v(pos + camera.offset, r, Color::BLUE);
         }
 
         for cuboid in &cuboids {
@@ -236,8 +254,8 @@ fn main() {
             let pos = rigid_body.translation().to_raylib_vector2();
             d.draw_rectangle_pro(
                 Rectangle {
-                    x: pos.x,
-                    y: pos.y, 
+                    x: pos.x + camera.offset.x,
+                    y: pos.y + camera.offset.y, 
                     width: half_extents.x * 2.0,
                     height: half_extents.y * 2.0,
                 },
@@ -245,9 +263,6 @@ fn main() {
                 rigid_body.rotation().angle().to_degrees(),
                 Color::RED
             );
-        }
-
-        for collision in &collisions.0 {
         }
     }
 }

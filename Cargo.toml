@@ -15,7 +15,6 @@ opt-level = 3
 
 [dependencies]
 rapier2d = { version = "*", features = [ "simd-stable" ] }
-rapier_testbed2d = "*"
 
 [dependencies.raylib]
 version = "5.0.0"
