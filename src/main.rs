@@ -4,6 +4,58 @@ use rapier2d::{
 };
 use raylib::prelude::*;
 
+// Adding additional methods to raylib camera2d
+pub trait ImprovedCamera {
+    fn to_screen(&self, world_pos: Vector2) -> Vector2;
+    fn to_screen_x(&self, world_pos_x: f32) -> f32;
+    fn to_screen_y(&self, world_pos_y: f32) -> f32;
+    fn to_screen_rect(&self, rect: &Rectangle) -> Rectangle;
+    fn to_world(&self, screen_pos: Vector2) -> Vector2;
+    fn track(&mut self, pos: Vector2, screen_size: Vector2);
+    fn get_world_pos(&self, offset: Vector2, screen_size: Vector2) -> Vector2;
+    fn get_screen_offset(&self, world_pos: Vector2, screen_size: Vector2) -> Vector2;
+}
+
+impl ImprovedCamera for Camera2D {
+    fn to_screen(&self, world_pos: Vector2) -> Vector2 {
+        (world_pos + self.offset) * self.zoom
+    }
+
+    fn to_screen_x(&self, world_pos_x: f32) -> f32 {
+        (world_pos_x + self.offset.x) * self.zoom
+    }
+
+    fn to_screen_y(&self, world_pos_y: f32) -> f32 {
+        (world_pos_y + self.offset.y) * self.zoom
+    }
+
+    fn to_screen_rect(&self, rect: &Rectangle) -> Rectangle {
+        Rectangle {
+            x: (rect.x + self.offset.x) * self.zoom,
+            y: (rect.y + self.offset.y) * self.zoom,
+            width: rect.width * self.zoom,
+            height: rect.height * self.zoom,
+        }
+    }
+
+    fn to_world(&self, screen_pos: Vector2) -> Vector2 {
+        (screen_pos / self.zoom) - self.offset
+    }
+
+    fn track(&mut self, target_world_pos: Vector2, screen_size: Vector2) {
+        self.offset = self.get_screen_offset(target_world_pos, screen_size);
+    }
+
+    fn get_world_pos(&self, offset: Vector2, screen_size: Vector2) -> Vector2 {
+        -offset + screen_size / (2.0 * self.zoom)
+    }
+
+    fn get_screen_offset(&self, world_pos: Vector2, screen_size: Vector2) -> Vector2 {
+        -world_pos + screen_size / 2.0 / self.zoom
+    }
+}
+
+
 trait RaylibVector2 {
     fn to_raylib_vector2(&self) -> Vector2;
     fn from_raylib_vector2(vector: Vector2) -> Self;
@@ -18,13 +70,49 @@ impl RaylibVector2 for rapier2d::na::Vector2<f32> {
     }
 }
 
-struct Cuboid {
-    rigid_body_handle: RigidBodyHandle,
-    collider_handle: ColliderHandle,
+enum Collider {
+    Cuboid {
+        rigid_body_handle: RigidBodyHandle,
+        collider_handle: ColliderHandle,
+    },
+    Ball {
+        rigid_body_handle: RigidBodyHandle,
+        collider_handle: ColliderHandle,
+    }
 }
 
-impl Cuboid {
-    pub fn new(
+impl Collider {
+    pub fn get_handles(&self) -> (RigidBodyHandle, ColliderHandle) {
+        match *self {
+            Collider::Cuboid { rigid_body_handle, collider_handle } => (rigid_body_handle, collider_handle),
+            Collider::Ball { rigid_body_handle, collider_handle } => (rigid_body_handle, collider_handle),
+        }
+    }
+
+    pub fn set_vel(&mut self, vel: Vector2, collision_world: &mut CollisionWorld) {
+        let rigid_body = &mut collision_world.rigid_body_set[self.get_handles().0];
+        rigid_body.set_linvel(rapier2d::na::Vector2::from_raylib_vector2(vel), true);
+    }
+
+    pub fn add_vel(&mut self, vel: Vector2, collision_world: &mut CollisionWorld) {
+        let rigid_body = &mut collision_world.rigid_body_set[self.get_handles().0];
+        rigid_body.apply_impulse(rapier2d::na::Vector2::from_raylib_vector2(vel), true);
+    }
+
+    pub fn get_pos(&self, collision_world: &mut CollisionWorld) -> Vector2 {
+        let rigid_body = &collision_world.rigid_body_set[self.get_handles().0];
+        rigid_body.position().translation.vector.to_raylib_vector2()
+    }
+
+    pub fn get_vel(&self, collision_world: &mut CollisionWorld) -> Vector2 {
+        let rigid_body = &collision_world.rigid_body_set[self.get_handles().0];
+        rigid_body.linvel().to_raylib_vector2()
+    }
+}
+
+
+impl Collider {
+    pub fn new_cuboid(
         pos: Vector2,
         vel: Vector2,
         half_extents: Vector2,
@@ -42,20 +130,16 @@ impl Cuboid {
         let rigid_body_handle = rigid_body_set.insert(rigid_body);
         let collider_handle =
             collider_set.insert_with_parent(collider, rigid_body_handle, rigid_body_set);
-        Self {
+        Collider::Cuboid {
             rigid_body_handle,
             collider_handle,
         }
     }
 }
 
-struct Ball {
-    rigid_body_handle: RigidBodyHandle,
-    collider_handle: ColliderHandle,
-}
 
-impl Ball {
-    pub fn new(
+impl Collider {
+    pub fn new_ball(
         pos: Vector2,
         vel: Vector2,
         radius: f32,
@@ -73,10 +157,49 @@ impl Ball {
         let rigid_body_handle = rigid_body_set.insert(rigid_body);
         let collider_handle =
             collider_set.insert_with_parent(collider, rigid_body_handle, rigid_body_set);
-        Self {
+        Collider::Ball {
             rigid_body_handle,
             collider_handle,
         }
+    }
+}
+
+impl Collider {
+    pub fn draw(&self, collision_world: &CollisionWorld, camera: Camera2D,d: &mut RaylibDrawHandle) {
+        match self {
+            Collider::Cuboid { rigid_body_handle, collider_handle } => {
+                let rigid_body = &collision_world.rigid_body_set[*rigid_body_handle];
+                let collider = collision_world.collider_set[*collider_handle]
+                    .shape()
+                    .as_cuboid()
+                    .unwrap();
+                let half_extents = collider.half_extents.to_raylib_vector2();
+                let pos = rigid_body.translation().to_raylib_vector2();
+                d.draw_rectangle_pro(
+                    Rectangle {
+                        x: camera.to_screen_x(pos.x),
+                        y: camera.to_screen_y(pos.y), 
+                        width: half_extents.x * 2.0 * camera.zoom,
+                        height: half_extents.y * 2.0 * camera.zoom,
+                    },
+                    half_extents * camera.zoom,
+                    rigid_body.rotation().angle().to_degrees(),
+                    Color::RED
+                );
+            },
+            Collider::Ball { rigid_body_handle, collider_handle } => {
+                let pos = collision_world.rigid_body_set[*rigid_body_handle]
+                .translation()
+                .to_raylib_vector2();
+                let r = collision_world.collider_set[*collider_handle]
+                .shape()
+                .as_ball()
+                .unwrap()
+                .radius;
+            d.draw_circle_v(camera.to_screen(pos), r * camera.zoom, Color::BLUE);
+            },
+        }
+
     }
 }
 
@@ -159,17 +282,21 @@ impl CollisionWorld {
     }
 }
 
+
 fn main() {
     let (mut rl, thread) = raylib::init()
         .size(1080, 720)
         .title("Physics")
         .vsync()
         .build();
-    let mut camera = Camera2D::default();
+    let mut camera = Camera2D {
+        zoom: 25.0,
+        ..Default::default()
+    };
     let mut collision_world = CollisionWorld::default();
     let ground_collider = ColliderBuilder::cuboid(1000.0, 0.1).build();
     let ground_rigid_body = RigidBodyBuilder::fixed()
-        .translation(vector![0.0, 720.0])
+        .translation(vector![0.0, 20.0])
         .build();
     let ground_body_handle = collision_world.rigid_body_set.insert(ground_rigid_body);
     collision_world.collider_set.insert_with_parent(
@@ -178,25 +305,25 @@ fn main() {
         &mut collision_world.rigid_body_set,
     );
 
+
     /* Create the bouncing ball. */
-    let mut balls = vec![];
-    let mut cuboids = vec![];
+    let mut colliders = vec![];
 
     for x in 0..10 {
         for y in 0..10 {
             if rl.get_random_value::<i32>(0..2) == 1 {
-                balls.push(Ball::new(
-                    Vector2::new(x as f32 * 21.0, y as f32 * 21.0),
+                colliders.push(Collider::new_ball(
+                    Vector2::new(x as f32, y as f32),
                     Vector2::zero(),
-                    10.0,
+                    0.5,
                     &mut collision_world.rigid_body_set,
                     &mut collision_world.collider_set,
                 ));
             } else {
-                cuboids.push(Cuboid::new(
-                    Vector2::new(x as f32 * 21.0, y as f32 * 21.0),
+                colliders.push(Collider::new_cuboid(
+                    Vector2::new(x as f32, y as f32),
                     Vector2::zero(),
-                    Vector2::new(10.0, 10.0),
+                    Vector2::new(0.5, 0.5),
                     &mut collision_world.rigid_body_set,
                     &mut collision_world.collider_set,
                 ));
@@ -205,25 +332,40 @@ fn main() {
         }
     }
 
+    let mut player = Collider::new_cuboid(
+        Vector2::new(20.0, 0.0),
+        Vector2::zero(),
+        Vector2::new(2.0, 2.0),
+        &mut collision_world.rigid_body_set,
+        &mut collision_world.collider_set
+    );
+
     while !rl.window_should_close() {
         /*
          * Update
          */
+
         
         if rl.is_key_down(KeyboardKey::KEY_W) {
-            camera.offset.y += 100.0 * rl.get_frame_time();
+            camera.offset.y += 10.0 * rl.get_frame_time();
         }
         if rl.is_key_down(KeyboardKey::KEY_S) {
-            camera.offset.y -= 100.0 * rl.get_frame_time();
+            camera.offset.y -= 10.0 * rl.get_frame_time();
         }
         if rl.is_key_down(KeyboardKey::KEY_A) {
-            camera.offset.x += 100.0 * rl.get_frame_time();
+            camera.offset.x += 10.0 * rl.get_frame_time();
         }
         if rl.is_key_down(KeyboardKey::KEY_D) {
-            camera.offset.x -= 100.0 * rl.get_frame_time();
+            camera.offset.x -= 10.0 * rl.get_frame_time();
         }
         collision_world.integration_parameters.dt = rl.get_frame_time();
         collision_world.step();
+        let player_pos = player.get_pos(&mut collision_world);
+        let mouse_pos = camera.to_world(rl.get_mouse_position());
+        let d = mouse_pos - player_pos;
+        if rl.is_key_down(KeyboardKey::KEY_SPACE) {
+            player.add_vel(dbg!(d.normalized() * 4.0), &mut collision_world);
+        }
         let collisions = collision_world.get_collisions();
 
         /*
@@ -231,38 +373,10 @@ fn main() {
          */
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
-        for ball in &balls {
-            let pos = collision_world.rigid_body_set[ball.rigid_body_handle]
-                .translation()
-                .to_raylib_vector2();
-            let r = collision_world.collider_set[ball.collider_handle]
-                .shape()
-                .as_ball()
-                .unwrap()
-                .radius;
-            d.draw_circle_v(pos + camera.offset, r, Color::BLUE);
+        for collider in &colliders {
+            collider.draw(&collision_world, camera, &mut d);
         }
 
-        for cuboid in &cuboids {
-            let rigid_body = &collision_world.rigid_body_set[cuboid.rigid_body_handle];
-            let collider = collision_world.collider_set[cuboid.collider_handle]
-                .shape()
-                .as_cuboid()
-                .unwrap();
-            let half_extents = collider.half_extents.to_raylib_vector2();
-                
-            let pos = rigid_body.translation().to_raylib_vector2();
-            d.draw_rectangle_pro(
-                Rectangle {
-                    x: pos.x + camera.offset.x,
-                    y: pos.y + camera.offset.y, 
-                    width: half_extents.x * 2.0,
-                    height: half_extents.y * 2.0,
-                },
-                half_extents,
-                rigid_body.rotation().angle().to_degrees(),
-                Color::RED
-            );
-        }
+        player.draw(&collision_world, camera, &mut d);
     }
 }
