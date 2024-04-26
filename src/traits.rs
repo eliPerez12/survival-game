@@ -53,17 +53,18 @@ impl ImprovedCamera for Camera2D {
     }
 
     fn handle_camera_controls(&mut self, rl: &RaylibHandle) {
+        let camera_speed = 300.0 * rl.get_frame_time() / self.zoom;
         if rl.is_key_down(KeyboardKey::KEY_W) {
-            self.offset.y += 10.0 * rl.get_frame_time();
+            self.offset.y += camera_speed;
         }
         if rl.is_key_down(KeyboardKey::KEY_S) {
-            self.offset.y -= 10.0 * rl.get_frame_time();
+            self.offset.y -= camera_speed;
         }
         if rl.is_key_down(KeyboardKey::KEY_A) {
-            self.offset.x += 10.0 * rl.get_frame_time();
+            self.offset.x += camera_speed;
         }
         if rl.is_key_down(KeyboardKey::KEY_D) {
-            self.offset.x -= 10.0 * rl.get_frame_time();
+            self.offset.x -= camera_speed;
         }
 
         let screen_size = Vector2::new(rl.get_screen_width() as f32, rl.get_screen_height() as f32);
