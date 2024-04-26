@@ -13,14 +13,14 @@ impl RaylibVector2 for Vec2<f32> {
     }
 }
 
-struct Collider {
+struct WorldCollider {
     shape: ShapeHandle<f32>,
     isometry: Isometry2<f32>,
 }
 
-impl Collider {
+impl WorldCollider {
     pub fn new(pos: Vector2, size: Vector2) -> Self {
-        Collider {
+        WorldCollider {
             shape: ShapeHandle::new(Cuboid::new(Vec2::from_raylib_vector2(size/2.0))),
             isometry: Isometry2::new(Vec2::from_raylib_vector2(pos), std::f32::consts::PI/2.0),
         }
@@ -114,7 +114,7 @@ fn main() {
         .vsync()
         .build();
 
-    let mut cuboid_collider = Collider::new(
+    let mut cuboid_collider = WorldCollider::new(
         Vector2::new(0.0, 0.0),
         Vector2::new(50.0, 100.0)
     );
