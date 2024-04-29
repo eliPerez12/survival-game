@@ -1,8 +1,8 @@
-use world_collider::WorldCollider;
 use rapier2d::na::Isometry2;
 use rapier2d::na::Vector2 as Vec2;
 use rapier2d::prelude::*;
 use raylib::prelude::*;
+use world_collider::WorldCollider;
 
 use crate::collision_world::*;
 use crate::traits::*;
@@ -25,7 +25,7 @@ fn main() {
     let ground_collider = WorldCollider::new_cuboid(
         Vector2::new(100.0, 100.0),
         Vector2::new(0.0, 0.0),
-        Vector2::new(1000.0, 1.0), 
+        Vector2::new(1000.0, 1.0),
         true,
         &mut collision_world.rigid_body_set,
         &mut collision_world.collider_set,
@@ -34,9 +34,10 @@ fn main() {
     /* Create the bouncing ball. */
     let mut colliders = vec![];
 
-    for x in 0..80 {
-        for y in 0..50 {
-            if rl.get_random_value::<i32>(0..2) == 1 {
+    for x in 0..20 {
+        for y in 0..30 {
+            let rand = rl.get_random_value::<i32>(1..3);
+            if rand == 1 {
                 colliders.push(WorldCollider::new_ball(
                     Vector2::new(x as f32, y as f32),
                     Vector2::zero(),
@@ -45,7 +46,7 @@ fn main() {
                     &mut collision_world.rigid_body_set,
                     &mut collision_world.collider_set,
                 ));
-            } else {
+            } else if rand == 2 {
                 colliders.push(WorldCollider::new_cuboid(
                     Vector2::new(x as f32, y as f32),
                     Vector2::zero(),
@@ -54,6 +55,19 @@ fn main() {
                     &mut collision_world.rigid_body_set,
                     &mut collision_world.collider_set,
                 ));
+            } else if rand == 3 {
+                colliders.push(WorldCollider::new_triangle(
+                    Vector2::new(x as f32, y as f32),
+                    Vector2::new(0.0, 0.0),
+                    (
+                        Vector2::new(0.0, -0.5),
+                        Vector2::new(0.5, 0.5),
+                        Vector2::new(-0.5, 0.5),
+                    ),
+                    false,
+                    &mut collision_world.rigid_body_set,
+                    &mut collision_world.collider_set,
+                ))
             }
         }
     }
@@ -62,19 +76,22 @@ fn main() {
     let mut player_collider = WorldCollider::new_compound(
         Vector2::new(-10.0, 0.0),
         Vector2::zero(),
-        vec![(
-            Isometry2::new(
-                rapier2d::na::Vector2::from_raylib_vector2(Vector2::new(0.0, 0.0)),
-                0.0,
+        vec![
+            (
+                Isometry2::new(
+                    rapier2d::na::Vector2::from_raylib_vector2(Vector2::new(0.0, 0.0)),
+                    0.0,
+                ),
+                SharedShape::new(Cuboid::new(Vec2::new(2.0, 2.0))),
             ),
-            SharedShape::new(Cuboid::new(Vec2::new(2.0, 2.0))),
-        ),(
-            Isometry2::new(
-                rapier2d::na::Vector2::from_raylib_vector2(Vector2::new(2.0, 0.0)),
-                0.0,
+            (
+                Isometry2::new(
+                    rapier2d::na::Vector2::from_raylib_vector2(Vector2::new(2.0, 0.0)),
+                    0.0,
+                ),
+                SharedShape::new(Cuboid::new(Vec2::new(2.0, 2.0))),
             ),
-            SharedShape::new(Cuboid::new(Vec2::new(2.0, 2.0))),
-        )],
+        ],
         false,
         &mut collision_world.rigid_body_set,
         &mut collision_world.collider_set,

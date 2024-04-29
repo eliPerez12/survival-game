@@ -1,9 +1,6 @@
 #![allow(dead_code)]
 
-use rapier2d::{
-    geometry::SharedShape,
-    prelude::*,
-};
+use rapier2d::{geometry::SharedShape, prelude::*};
 use raylib::prelude::*;
 
 use crate::traits::*;
@@ -15,6 +12,10 @@ pub enum WorldCollider {
         collider_handle: ColliderHandle,
     },
     Ball {
+        rigid_body_handle: RigidBodyHandle,
+        collider_handle: ColliderHandle,
+    },
+    Triangle {
         rigid_body_handle: RigidBodyHandle,
         collider_handle: ColliderHandle,
     },
@@ -32,6 +33,10 @@ impl WorldCollider {
                 collider_handle,
             } => (rigid_body_handle, collider_handle),
             WorldCollider::Ball {
+                rigid_body_handle,
+                collider_handle,
+            } => (rigid_body_handle, collider_handle),
+            WorldCollider::Triangle {
                 rigid_body_handle,
                 collider_handle,
             } => (rigid_body_handle, collider_handle),
@@ -62,7 +67,9 @@ impl WorldCollider {
     }
 
     pub fn get_angle(&self, collision_world: &RapierCollisionWorld) -> f32 {
-        collision_world.collider_set[self.get_handles().1].rotation().angle()
+        collision_world.collider_set[self.get_handles().1]
+            .rotation()
+            .angle()
     }
 
     pub fn get_mut<'a>(
@@ -145,6 +152,37 @@ impl WorldCollider {
     }
 }
 
+impl WorldCollider {
+    pub fn new_triangle(
+        pos: Vector2,
+        vel: Vector2,
+        points: (Vector2, Vector2, Vector2),
+        fixed: bool,
+        rigid_body_set: &mut RigidBodySet,
+        collider_set: &mut ColliderSet,
+    ) -> WorldCollider {
+        let rigid_body = match fixed {
+            true => RigidBodyBuilder::fixed(),
+            false => RigidBodyBuilder::dynamic(),
+        }
+        .translation(rapier2d::na::Vector2::from_raylib_vector2(pos))
+        .linvel(rapier2d::na::Vector2::from_raylib_vector2(vel))
+        .build();
+        let collider = ColliderBuilder::triangle(
+            rapier2d::na::Vector2::from_raylib_vector2(points.0).into(),
+            rapier2d::na::Vector2::from_raylib_vector2(points.1).into(),
+            rapier2d::na::Vector2::from_raylib_vector2(points.2).into(),
+        );
+        let rigid_body_handle = rigid_body_set.insert(rigid_body);
+        let collider_handle =
+            collider_set.insert_with_parent(collider, rigid_body_handle, rigid_body_set);
+        WorldCollider::Triangle {
+            rigid_body_handle,
+            collider_handle,
+        }
+    }
+}
+
 type Shapes = Vec<(
     nalgebra::Isometry<f32, nalgebra::Unit<nalgebra::Complex<f32>>, 2>,
     SharedShape,
@@ -187,7 +225,8 @@ impl WorldCollider {
         match self {
             WorldCollider::Cuboid { .. } => self.draw_cuboid(d, &camera, collision_world),
             WorldCollider::Ball { .. } => self.draw_ball(d, &camera, collision_world),
-            WorldCollider::Compound {..} => {self.draw_compound(d, &camera, collision_world)}
+            WorldCollider::Compound { .. } => self.draw_compound(d, &camera, collision_world),
+            WorldCollider::Triangle { .. } => self.draw_triangle(d, &camera, collision_world),
         }
     }
 
@@ -236,6 +275,35 @@ impl WorldCollider {
         d.draw_circle_v(camera.to_screen(pos), r * camera.zoom, Color::BLUE);
     }
 
+    fn draw_triangle(
+        &self,
+        d: &mut RaylibDrawHandle,
+        camera: &Camera2D,
+        collision_world: &RapierCollisionWorld,
+    ) {
+        let triangle_rigid_body = &collision_world.rigid_body_set[self.get_handles().0];
+        let triangle_collider = &collision_world.collider_set[self.get_handles().1];
+        let pos = triangle_rigid_body
+            .position()
+            .translation
+            .vector
+            .to_raylib_vector2();
+        let shape = triangle_collider.shape().as_triangle().unwrap();
+        let angle = triangle_collider.rotation().angle();
+        let points = (
+            (shape.a.coords.to_raylib_vector2().rotated(angle) + pos),
+            (shape.c.coords.to_raylib_vector2().rotated(angle) + pos),
+            (shape.b.coords.to_raylib_vector2().rotated(angle) + pos),
+        );
+
+        d.draw_triangle(
+            camera.to_screen(points.0),
+            camera.to_screen(points.1),
+            camera.to_screen(points.2),
+            Color::YELLOW,
+        );
+    }
+
     fn draw_compound(
         &self,
         d: &mut RaylibDrawHandle,
@@ -252,31 +320,29 @@ impl WorldCollider {
         for (isometry, shape) in shapes {
             let relative_pos = isometry.translation.vector.to_raylib_vector2();
             let angle = isometry.rotation.angle();
-            let final_pos = compound_pos.translation.vector.to_raylib_vector2() + relative_pos.rotated(angle + compound_pos.rotation.angle());
+            let final_pos = compound_pos.translation.vector.to_raylib_vector2()
+                + relative_pos.rotated(angle + compound_pos.rotation.angle());
 
             let shape_type = shape.0.shape_type();
             match shape_type {
                 ShapeType::Ball => {
                     let r = shape.as_ball().unwrap().radius;
-                    d.draw_circle_v(
-                        camera.to_screen(final_pos),
-                        r * camera.zoom,
-                        Color::BLUE,
-                    );
+                    d.draw_circle_v(camera.to_screen(final_pos), r * camera.zoom, Color::WHITE);
                 }
                 ShapeType::Cuboid => {
                     let half_extents = shape.as_cuboid().unwrap().half_extents.to_raylib_vector2();
                     d.draw_rectangle_pro(
-                    Rectangle {
-                        x: camera.to_screen_x(final_pos.x),
-                        y: camera.to_screen_y(final_pos.y),
-                        width: half_extents.x * 2.0 * camera.zoom,
-                        height: half_extents.y * 2.0 * camera.zoom,
-                    },
-                    half_extents * camera.zoom,
-                    rigid_body.rotation().angle().to_degrees(),
-                    Color::RED,
-                );},
+                        Rectangle {
+                            x: camera.to_screen_x(final_pos.x),
+                            y: camera.to_screen_y(final_pos.y),
+                            width: half_extents.x * 2.0 * camera.zoom,
+                            height: half_extents.y * 2.0 * camera.zoom,
+                        },
+                        half_extents * camera.zoom,
+                        rigid_body.rotation().angle().to_degrees(),
+                        Color::WHITE,
+                    );
+                }
                 _ => unimplemented!(),
             }
         }
