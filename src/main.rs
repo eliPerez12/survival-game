@@ -13,13 +13,11 @@ mod world_collider;
 
 #[derive(Default)]
 pub struct CollisionWorld {
-    rapier: RapierCollisionWorld
+    rapier: RapierCollisionWorld,
 }
 
-
-
 impl CollisionWorld {
-    const MIN_PHYSICS_ACCURACY: f32 = 1.0/60.0;
+    const MIN_PHYSICS_ACCURACY: f32 = 1.0 / 60.0;
 
     pub fn step(&mut self, rl: &RaylibHandle) {
         self.rapier.integration_parameters.dt = rl.get_frame_time().min(Self::MIN_PHYSICS_ACCURACY);
@@ -40,23 +38,22 @@ pub fn add_bounds(collision_world: &mut CollisionWorld, colliders: &mut Vec<Worl
         Vector2::new(0.0, 0.0),
         Vector2::new(100.0, 1.0),
         true,
-        collision_world
+        collision_world,
     ));
     colliders.push(WorldCollider::new_cuboid(
         Vector2::new(-100.0, 0.0),
         Vector2::new(0.0, 0.0),
         Vector2::new(1.0, 100.0),
         true,
-        collision_world
+        collision_world,
     ));
     colliders.push(WorldCollider::new_cuboid(
         Vector2::new(100.0, 0.0),
         Vector2::new(0.0, 0.0),
         Vector2::new(1.0, 100.0),
         true,
-        collision_world
+        collision_world,
     ));
-
 }
 
 fn main() {
@@ -72,7 +69,6 @@ fn main() {
     let mut collision_world = CollisionWorld::default();
     let mut colliders = vec![];
     add_bounds(&mut collision_world, &mut colliders);
-    
 
     for x in 0..30 {
         for y in 0..30 {
@@ -104,12 +100,11 @@ fn main() {
                         Vector2::new(-0.5, 0.5),
                     ),
                     false,
-                    &mut collision_world
+                    &mut collision_world,
                 ))
             }
         }
     }
-
 
     let mut player_collider = WorldCollider::new_compound(
         Vector2::new(-10.0, 0.0),
@@ -127,11 +122,11 @@ fn main() {
                     rapier2d::na::Vector2::from_raylib_vector2(Vector2::new(2.0, 0.0)),
                     0.0,
                 ),
-                SharedShape::new(Cuboid::new(Vec2::new(2.0, 2.0))),
+                SharedShape::new(Ball::new(2.0)),
             ),
         ],
         false,
-        &mut collision_world
+        &mut collision_world,
     );
 
     while !rl.window_should_close() {
@@ -162,11 +157,11 @@ fn main() {
         player_collider.draw(&collision_world, camera, &mut d);
 
         d.draw_text(
-            &(1.0/collision_world.rapier.integration_parameters.dt/60.0 * 100.0).to_string(),
+            &(1.0 / collision_world.rapier.integration_parameters.dt / 60.0 * 100.0).to_string(),
             0,
             0,
             40,
-            Color::WHITE
+            Color::WHITE,
         );
     }
 }
