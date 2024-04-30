@@ -5,7 +5,7 @@ use rapier2d::{
     prelude::*,
 };
 
-pub const GRAVITY: f32 = 9.81;
+pub const GRAVITY: f32 = 0.0;
 
 // TODO: Make all fields private
 pub struct RapierCollisionWorld {
