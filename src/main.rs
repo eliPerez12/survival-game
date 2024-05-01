@@ -1,3 +1,4 @@
+use debug::DebugInfo;
 use rapier2d::na::Isometry2;
 use rapier2d::na::Vector2 as Vec2;
 use rapier2d::prelude::*;
@@ -8,8 +9,10 @@ use crate::collision_world::*;
 use crate::traits::*;
 
 mod collision_world;
+mod draw_collider;
 mod traits;
 mod world_collider;
+mod debug;
 
 #[derive(Default)]
 pub struct CollisionWorld {
@@ -68,6 +71,7 @@ fn main() {
     };
     let mut collision_world = CollisionWorld::default();
     let mut colliders = vec![];
+    let mut debugger = DebugInfo::new();
     add_bounds(&mut collision_world, &mut colliders);
 
     for x in 0..30 {
@@ -134,6 +138,7 @@ fn main() {
          * Update
          */
 
+        debugger.update(&mut rl);
         camera.handle_camera_controls(&rl);
 
         let player_pos = player_collider.get_pos(&collision_world);
@@ -143,12 +148,19 @@ fn main() {
             player_collider.add_vel(d * 5000.0 * rl.get_frame_time(), &mut collision_world);
         }
 
+        debugger.add(format!("FPS: {}", rl.get_fps()));
+        debugger.add(format!("Num Colliders: {}", colliders.len()));
+        
+
         player_collider.get_angle(&collision_world);
         collision_world.step(&rl);
+
 
         /*
          * Drawing
          */
+
+        // World
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
         for collider in &colliders {
@@ -156,12 +168,7 @@ fn main() {
         }
         player_collider.draw(&collision_world, camera, &mut d);
 
-        d.draw_text(
-            &(1.0 / collision_world.rapier.integration_parameters.dt / 60.0 * 100.0).to_string(),
-            0,
-            0,
-            40,
-            Color::WHITE,
-        );
+        // UI
+        debugger.draw(&mut d);
     }
 }
