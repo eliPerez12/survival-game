@@ -16,75 +16,81 @@ mod rapier_world;
 mod traits;
 mod world_collider;
 
-pub fn add_bounds(collision_world: &mut CollisionWorld, colliders: &mut Vec<WorldColliderHandle>) {
-    colliders.push(collision_world.new_cuboid(
+pub fn add_bounds(collision_world: &mut CollisionWorld) {
+    collision_world.new_cuboid(
         Vector2::new(0.0, 100.0),
         Vector2::new(0.0, 0.0),
         Vector2::new(100.0, 1.0),
         true,
-    ));
-    colliders.push(collision_world.new_cuboid(
+    );
+    collision_world.new_cuboid(
         Vector2::new(0.0, -100.0),
         Vector2::new(0.0, 0.0),
         Vector2::new(100.0, 1.0),
         true,
-    ));
-    colliders.push(collision_world.new_cuboid(
+    );
+    collision_world.new_cuboid(
         Vector2::new(-100.0, 0.0),
         Vector2::new(0.0, 0.0),
-        Vector2::new(0.0, 100.0),
+        Vector2::new(1.0, 100.0),
         true,
-    ));
-    colliders.push(collision_world.new_cuboid(
+    );
+    collision_world.new_cuboid(
         Vector2::new(100.0, 0.0),
         Vector2::new(0.0, 0.0),
-        Vector2::new(0.0, 100.0),
+        Vector2::new(1.0, 100.0),
         true,
-    ));
+    );
 }
+
+fn add_random_colliders(collision_world: &mut CollisionWorld, rl: &RaylibHandle) {
+    let offset = 80.0;
+    for x in 0..40 {
+        for y in 0..40 {
+            let shape_half_size = rl.get_random_value::<i32>(5..10) as f32/10.0;
+            let rand = rl.get_random_value::<i32>(1..3);
+            if rand == 1 {
+                collision_world.new_ball(
+                    Vector2::new(x as f32 * 2.0 - offset, y as f32 * 2.0 - offset),
+                    Vector2::zero(),
+                    shape_half_size,
+                    false,
+                );
+            } else if rand == 2 {
+                collision_world.new_cuboid(
+                    Vector2::new(x as f32 * 2.0 - offset, y as f32 * 2.0 - offset),
+                    Vector2::zero(),
+                    Vector2::new(shape_half_size, shape_half_size),
+                    false,
+                );
+            } else if rand == 3 {
+                collision_world.new_triangle(
+                    Vector2::new(x as f32 * 2.0- offset, y as f32 * 2.0 - offset),
+                    Vector2::zero(),
+                    (
+                        Vector2::new(0.0, -shape_half_size),
+                        Vector2::new(shape_half_size, shape_half_size),
+                        Vector2::new(-shape_half_size, shape_half_size),
+                    ),
+                    false,
+                );
+            }
+        }
+    }
+}
+
 
 fn main() {
     let (mut rl, thread) = raylib::init().size(1080, 720).title("Physics").build();
     let mut camera = Camera2D {
-        zoom: 25.0,
+        offset: Vector2::new(0.0, 0.0),
+        zoom: 20.0,
         ..Default::default()
     };
     let mut collision_world = CollisionWorld::default();
-    let mut colliders = vec![];
     let mut debugger = DebugInfo::new();
-    add_bounds(&mut collision_world, &mut colliders);
-
-    for x in 0..50 {
-        for y in 0..50 {
-            let rand = rl.get_random_value::<i32>(1..3);
-            if rand == 1 {
-                colliders.push(collision_world.new_ball(
-                    Vector2::new(x as f32, y as f32),
-                    Vector2::zero(),
-                    0.5,
-                    false,
-                ));
-            } else if rand == 2 {
-                colliders.push(collision_world.new_cuboid(
-                    Vector2::new(x as f32, y as f32),
-                    Vector2::zero(),
-                    Vector2::new(0.5, 0.5),
-                    false,
-                ));
-            } else if rand == 3 {
-                colliders.push(collision_world.new_triangle(
-                    Vector2::new(x as f32, y as f32),
-                    Vector2::new(0.0, 0.0),
-                    (
-                        Vector2::new(0.0, -0.5),
-                        Vector2::new(0.5, 0.5),
-                        Vector2::new(-0.5, 0.5),
-                    ),
-                    false,
-                ))
-            }
-        }
-    }
+    add_bounds(&mut collision_world);
+    add_random_colliders(&mut collision_world, &rl);
 
     let mut player_collider = collision_world.new_compound(
         Vector2::new(-10.0, 0.0),
@@ -124,7 +130,7 @@ fn main() {
         }
 
         debugger.add(format!("FPS: {}", rl.get_fps()));
-        debugger.add(format!("Num Colliders: {}", colliders.len()));
+        debugger.add(format!("Num Colliders: {}", collision_world.colliders.len()));
 
         player_collider.get_angle(&collision_world);
         collision_world.step(&rl);
@@ -136,7 +142,7 @@ fn main() {
         // World
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
-        for collider in &colliders {
+        for collider in &collision_world.colliders {
             collider.draw(&collision_world, camera, &mut d);
         }
         player_collider.draw(&collision_world, camera, &mut d);

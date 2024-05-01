@@ -35,7 +35,8 @@ pub fn draw_ball(
     camera: &Camera2D,
 ) {
     let pos = isometry_shape.0.translation.vector.to_raylib_vector2();
-    let r = isometry_shape.1.as_ball().unwrap().radius;
+    let shape = isometry_shape.1.as_ball().unwrap();
+    let r = shape.radius;
     d.draw_circle_v(camera.to_screen(pos), r * camera.zoom, color);
 }
 
@@ -53,7 +54,6 @@ pub fn draw_triangle(
         (shape.c.coords.to_raylib_vector2().rotated(angle) + pos),
         (shape.b.coords.to_raylib_vector2().rotated(angle) + pos),
     );
-
     d.draw_triangle(
         camera.to_screen(points.0),
         camera.to_screen(points.1),

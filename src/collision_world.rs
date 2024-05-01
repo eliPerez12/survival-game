@@ -7,7 +7,7 @@ use crate::traits::*;
 #[derive(Default)]
 pub struct CollisionWorld {
     pub rapier: RapierCollisionWorld, //TODO: Make private
-    colliders: Vec<WorldColliderHandle>,
+    pub colliders: Vec<WorldColliderHandle>,
 }
 
 pub type Shapes = Vec<(
@@ -40,10 +40,12 @@ impl CollisionWorld {
             rigid_body_handle,
             &mut self.rapier.rigid_body_set,
         );
-        WorldColliderHandle::Cuboid {
+        let world_collider_handle = WorldColliderHandle::Cuboid {
             rigid_body_handle,
             collider_handle,
-        }
+        };
+        self.colliders.push(world_collider_handle.clone());
+        world_collider_handle
     }
 
     pub fn new_ball(
@@ -70,10 +72,12 @@ impl CollisionWorld {
             rigid_body_handle,
             &mut self.rapier.rigid_body_set,
         );
-        WorldColliderHandle::Ball {
+        let world_collider_handle = WorldColliderHandle::Ball {
             rigid_body_handle,
             collider_handle,
-        }
+        };
+        self.colliders.push(world_collider_handle.clone());
+        world_collider_handle
     }
 
     pub fn new_triangle(
@@ -104,10 +108,12 @@ impl CollisionWorld {
             rigid_body_handle,
             &mut self.rapier.rigid_body_set,
         );
-        WorldColliderHandle::Triangle {
+        let world_collider_handle = WorldColliderHandle::Triangle {
             rigid_body_handle,
             collider_handle,
-        }
+        };
+        self.colliders.push(world_collider_handle.clone());
+        world_collider_handle
     }
 
     pub fn new_compound(
@@ -131,15 +137,17 @@ impl CollisionWorld {
             rigid_body_handle,
             &mut self.rapier.rigid_body_set,
         );
-        WorldColliderHandle::Compound {
+        let world_collider_handle = WorldColliderHandle::Compound {
             rigid_body_handle,
             collider_handle,
-        }
+        };
+        self.colliders.push(world_collider_handle.clone());
+        world_collider_handle
     }
 }
 
 impl CollisionWorld {
-    const MIN_PHYSICS_ACCURACY: f32 = 1.0 / 60.0;
+    const MIN_PHYSICS_ACCURACY: f32 = 1.0 / 90.0;
 
     pub fn step(&mut self, rl: &RaylibHandle) {
         self.rapier.integration_parameters.dt = rl.get_frame_time().min(Self::MIN_PHYSICS_ACCURACY);

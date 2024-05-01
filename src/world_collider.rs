@@ -8,6 +8,7 @@ use crate::traits::*;
 use crate::CollisionWorld;
 use crate::RapierCollisionWorld;
 
+#[derive(Clone)]
 pub enum WorldColliderHandle {
     Cuboid {
         rigid_body_handle: RigidBodyHandle,
