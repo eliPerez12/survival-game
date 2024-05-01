@@ -1,70 +1,50 @@
+use collision_world::*;
 use debug::DebugInfo;
 use rapier2d::na::Isometry2;
 use rapier2d::na::Vector2 as Vec2;
 use rapier2d::prelude::*;
 use raylib::prelude::*;
-use world_collider::WorldCollider;
+use world_collider::WorldColliderHandle;
 
-use crate::collision_world::*;
+use crate::rapier_world::*;
 use crate::traits::*;
 
 mod collision_world;
+mod debug;
 mod draw_collider;
+mod rapier_world;
 mod traits;
 mod world_collider;
-mod debug;
 
-#[derive(Default)]
-pub struct CollisionWorld {
-    rapier: RapierCollisionWorld,
-}
-
-impl CollisionWorld {
-    const MIN_PHYSICS_ACCURACY: f32 = 1.0 / 60.0;
-
-    pub fn step(&mut self, rl: &RaylibHandle) {
-        self.rapier.integration_parameters.dt = rl.get_frame_time().min(Self::MIN_PHYSICS_ACCURACY);
-        self.rapier.step();
-    }
-}
-
-pub fn add_bounds(collision_world: &mut CollisionWorld, colliders: &mut Vec<WorldCollider>) {
-    colliders.push(WorldCollider::new_cuboid(
+pub fn add_bounds(collision_world: &mut CollisionWorld, colliders: &mut Vec<WorldColliderHandle>) {
+    colliders.push(collision_world.new_cuboid(
         Vector2::new(0.0, 100.0),
         Vector2::new(0.0, 0.0),
         Vector2::new(100.0, 1.0),
         true,
-        collision_world,
     ));
-    colliders.push(WorldCollider::new_cuboid(
+    colliders.push(collision_world.new_cuboid(
         Vector2::new(0.0, -100.0),
         Vector2::new(0.0, 0.0),
         Vector2::new(100.0, 1.0),
         true,
-        collision_world,
     ));
-    colliders.push(WorldCollider::new_cuboid(
+    colliders.push(collision_world.new_cuboid(
         Vector2::new(-100.0, 0.0),
         Vector2::new(0.0, 0.0),
-        Vector2::new(1.0, 100.0),
+        Vector2::new(0.0, 100.0),
         true,
-        collision_world,
     ));
-    colliders.push(WorldCollider::new_cuboid(
+    colliders.push(collision_world.new_cuboid(
         Vector2::new(100.0, 0.0),
         Vector2::new(0.0, 0.0),
-        Vector2::new(1.0, 100.0),
+        Vector2::new(0.0, 100.0),
         true,
-        collision_world,
     ));
 }
 
 fn main() {
-    let (mut rl, thread) = raylib::init()
-        .size(1080, 720)
-        .title("Physics")
-        //.vsync()
-        .build();
+    let (mut rl, thread) = raylib::init().size(1080, 720).title("Physics").build();
     let mut camera = Camera2D {
         zoom: 25.0,
         ..Default::default()
@@ -74,28 +54,25 @@ fn main() {
     let mut debugger = DebugInfo::new();
     add_bounds(&mut collision_world, &mut colliders);
 
-    for x in 0..30 {
-        for y in 0..30 {
+    for x in 0..50 {
+        for y in 0..50 {
             let rand = rl.get_random_value::<i32>(1..3);
             if rand == 1 {
-                colliders.push(WorldCollider::new_ball(
+                colliders.push(collision_world.new_ball(
                     Vector2::new(x as f32, y as f32),
                     Vector2::zero(),
                     0.5,
                     false,
-                    &mut collision_world.rapier.rigid_body_set,
-                    &mut collision_world.rapier.collider_set,
                 ));
             } else if rand == 2 {
-                colliders.push(WorldCollider::new_cuboid(
+                colliders.push(collision_world.new_cuboid(
                     Vector2::new(x as f32, y as f32),
                     Vector2::zero(),
                     Vector2::new(0.5, 0.5),
                     false,
-                    &mut collision_world,
                 ));
             } else if rand == 3 {
-                colliders.push(WorldCollider::new_triangle(
+                colliders.push(collision_world.new_triangle(
                     Vector2::new(x as f32, y as f32),
                     Vector2::new(0.0, 0.0),
                     (
@@ -104,13 +81,12 @@ fn main() {
                         Vector2::new(-0.5, 0.5),
                     ),
                     false,
-                    &mut collision_world,
                 ))
             }
         }
     }
 
-    let mut player_collider = WorldCollider::new_compound(
+    let mut player_collider = collision_world.new_compound(
         Vector2::new(-10.0, 0.0),
         Vector2::zero(),
         vec![
@@ -130,7 +106,6 @@ fn main() {
             ),
         ],
         false,
-        &mut collision_world,
     );
 
     while !rl.window_should_close() {
@@ -150,11 +125,9 @@ fn main() {
 
         debugger.add(format!("FPS: {}", rl.get_fps()));
         debugger.add(format!("Num Colliders: {}", colliders.len()));
-        
 
         player_collider.get_angle(&collision_world);
         collision_world.step(&rl);
-
 
         /*
          * Drawing

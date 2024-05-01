@@ -1,88 +1,148 @@
-#![allow(dead_code)]
+use crate::world_collider::WorldColliderHandle;
+use rapier2d::prelude::*;
+use raylib::prelude::*;
 
-use rapier2d::{
-    crossbeam::{self, channel::Receiver},
-    prelude::*,
-};
-
-pub const GRAVITY: f32 = 0.0;
-
-// TODO: Make all fields private
-pub struct RapierCollisionWorld {
-    physics_pipeline: PhysicsPipeline,
-    gravity: Vector<Real>,
-    pub integration_parameters: IntegrationParameters,
-    island_manager: IslandManager,
-    broad_phase: BroadPhase,
-    narrow_phase: NarrowPhase,
-    pub rigid_body_set: RigidBodySet,
-    pub collider_set: ColliderSet,
-    impulse_joint_set: ImpulseJointSet,
-    multibody_joint_set: MultibodyJointSet,
-    ccd_solver: CCDSolver,
-    query_pipeline: QueryPipeline,
-    event_handler: ChannelEventCollector,
-    collision_recv: Receiver<CollisionEvent>,
-    contact_force_recv: Receiver<ContactForceEvent>,
+use crate::rapier_world::*;
+use crate::traits::*;
+#[derive(Default)]
+pub struct CollisionWorld {
+    pub rapier: RapierCollisionWorld, //TODO: Make private
+    colliders: Vec<WorldColliderHandle>,
 }
 
-impl Default for RapierCollisionWorld {
-    fn default() -> Self {
-        // Initialize the event collector.
-        let (collision_send, collision_recv) = crossbeam::channel::unbounded();
-        let (contact_force_send, contact_force_recv) = crossbeam::channel::unbounded();
-        Self {
-            gravity: vector![0.0, GRAVITY],
-            integration_parameters: IntegrationParameters::default(),
-            physics_pipeline: PhysicsPipeline::new(),
-            island_manager: IslandManager::new(),
-            broad_phase: BroadPhase::new(),
-            narrow_phase: NarrowPhase::new(),
-            impulse_joint_set: ImpulseJointSet::new(),
-            multibody_joint_set: MultibodyJointSet::new(),
-            ccd_solver: CCDSolver::new(),
-            rigid_body_set: RigidBodySet::new(),
-            collider_set: ColliderSet::new(),
-            query_pipeline: QueryPipeline::new(),
-            event_handler: { ChannelEventCollector::new(collision_send, contact_force_send) },
-            collision_recv,
-            contact_force_recv,
+pub type Shapes = Vec<(
+    nalgebra::Isometry<f32, nalgebra::Unit<nalgebra::Complex<f32>>, 2>,
+    SharedShape,
+)>;
+
+impl CollisionWorld {
+    pub fn new_cuboid(
+        &mut self,
+        pos: Vector2,
+        vel: Vector2,
+        half_extents: Vector2,
+        fixed: bool,
+    ) -> WorldColliderHandle {
+        let rigid_body = match fixed {
+            true => RigidBodyBuilder::fixed(),
+            false => RigidBodyBuilder::dynamic(),
         }
-    }
-}
-
-impl RapierCollisionWorld {
-    pub fn step(&mut self) {
-        self.physics_pipeline.step(
-            &self.gravity,
-            &self.integration_parameters,
-            &mut self.island_manager,
-            &mut self.broad_phase,
-            &mut self.narrow_phase,
-            &mut self.rigid_body_set,
-            &mut self.collider_set,
-            &mut self.impulse_joint_set,
-            &mut self.multibody_joint_set,
-            &mut self.ccd_solver,
-            Some(&mut self.query_pipeline),
-            &(),
-            &self.event_handler,
+        .translation(rapier2d::na::Vector2::from_raylib_vector2(pos))
+        .linvel(rapier2d::na::Vector2::from_raylib_vector2(vel))
+        .build();
+        let collider = ColliderBuilder::cuboid(half_extents.x, half_extents.y)
+            .restitution(0.7)
+            .active_events(ActiveEvents::COLLISION_EVENTS)
+            .build();
+        let rigid_body_handle = self.rapier.rigid_body_set.insert(rigid_body);
+        let collider_handle = self.rapier.collider_set.insert_with_parent(
+            collider,
+            rigid_body_handle,
+            &mut self.rapier.rigid_body_set,
         );
+        WorldColliderHandle::Cuboid {
+            rigid_body_handle,
+            collider_handle,
+        }
     }
 
-    pub fn get_collisions(&self) -> (Vec<CollisionEvent>, Vec<ContactForceEvent>) {
-        let mut collisions = vec![];
-        let mut contacts = vec![];
-        while let Ok(collision_event) = self.collision_recv.try_recv() {
-            // Handle the collision event.
-            collisions.push(collision_event);
+    pub fn new_ball(
+        &mut self,
+        pos: Vector2,
+        vel: Vector2,
+        radius: f32,
+        fixed: bool,
+    ) -> WorldColliderHandle {
+        let rigid_body = match fixed {
+            true => RigidBodyBuilder::fixed(),
+            false => RigidBodyBuilder::dynamic(),
         }
-
-        while let Ok(contact_force_event) = self.contact_force_recv.try_recv() {
-            // Handle the collision event.
-            contacts.push(contact_force_event);
+        .translation(rapier2d::na::Vector2::from_raylib_vector2(pos))
+        .linvel(rapier2d::na::Vector2::from_raylib_vector2(vel))
+        .build();
+        let collider = ColliderBuilder::ball(radius)
+            .restitution(0.7)
+            .active_events(ActiveEvents::COLLISION_EVENTS)
+            .build();
+        let rigid_body_handle = self.rapier.rigid_body_set.insert(rigid_body);
+        let collider_handle = self.rapier.collider_set.insert_with_parent(
+            collider,
+            rigid_body_handle,
+            &mut self.rapier.rigid_body_set,
+        );
+        WorldColliderHandle::Ball {
+            rigid_body_handle,
+            collider_handle,
         }
+    }
 
-        (collisions, contacts)
+    pub fn new_triangle(
+        &mut self,
+        pos: Vector2,
+        vel: Vector2,
+        points: (Vector2, Vector2, Vector2),
+        fixed: bool,
+    ) -> WorldColliderHandle {
+        let rigid_body = match fixed {
+            true => RigidBodyBuilder::fixed(),
+            false => RigidBodyBuilder::dynamic(),
+        }
+        .translation(rapier2d::na::Vector2::from_raylib_vector2(pos))
+        .linvel(rapier2d::na::Vector2::from_raylib_vector2(vel))
+        .build();
+        let collider = ColliderBuilder::triangle(
+            rapier2d::na::Vector2::from_raylib_vector2(points.0).into(),
+            rapier2d::na::Vector2::from_raylib_vector2(points.1).into(),
+            rapier2d::na::Vector2::from_raylib_vector2(points.2).into(),
+        )
+        .restitution(0.7)
+        .active_events(ActiveEvents::COLLISION_EVENTS)
+        .build();
+        let rigid_body_handle = self.rapier.rigid_body_set.insert(rigid_body);
+        let collider_handle = self.rapier.collider_set.insert_with_parent(
+            collider,
+            rigid_body_handle,
+            &mut self.rapier.rigid_body_set,
+        );
+        WorldColliderHandle::Triangle {
+            rigid_body_handle,
+            collider_handle,
+        }
+    }
+
+    pub fn new_compound(
+        &mut self,
+        pos: Vector2,
+        vel: Vector2,
+        shapes: Shapes,
+        fixed: bool,
+    ) -> WorldColliderHandle {
+        let rigid_body = match fixed {
+            true => RigidBodyBuilder::fixed(),
+            false => RigidBodyBuilder::dynamic(),
+        }
+        .translation(rapier2d::na::Vector2::from_raylib_vector2(pos))
+        .linvel(rapier2d::na::Vector2::from_raylib_vector2(vel))
+        .build();
+        let collider = ColliderBuilder::compound(shapes);
+        let rigid_body_handle = self.rapier.rigid_body_set.insert(rigid_body);
+        let collider_handle = self.rapier.collider_set.insert_with_parent(
+            collider,
+            rigid_body_handle,
+            &mut self.rapier.rigid_body_set,
+        );
+        WorldColliderHandle::Compound {
+            rigid_body_handle,
+            collider_handle,
+        }
+    }
+}
+
+impl CollisionWorld {
+    const MIN_PHYSICS_ACCURACY: f32 = 1.0 / 60.0;
+
+    pub fn step(&mut self, rl: &RaylibHandle) {
+        self.rapier.integration_parameters.dt = rl.get_frame_time().min(Self::MIN_PHYSICS_ACCURACY);
+        self.rapier.step();
     }
 }

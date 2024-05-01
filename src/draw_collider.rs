@@ -1,4 +1,4 @@
-use crate::{traits::*, RapierCollisionWorld, WorldCollider};
+use crate::{traits::*, RapierCollisionWorld, WorldColliderHandle};
 use rapier2d::na::{Isometry, Isometry2, UnitComplex};
 use rapier2d::prelude::*;
 use raylib::prelude::*;
@@ -70,7 +70,7 @@ pub fn isometry_shape(pos: Vector2, angle: f32, shape: &dyn Shape) -> IsometrySh
 }
 
 pub fn draw_compound(
-    collider: &WorldCollider,
+    collider: &WorldColliderHandle,
     color: Color,
     d: &mut RaylibDrawHandle,
     camera: &Camera2D,
