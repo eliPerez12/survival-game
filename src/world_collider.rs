@@ -50,9 +50,32 @@ impl WorldColliderHandle {
         }
     }
 
-    pub fn add_vel(&mut self, vel: Vector2, collision_world: &mut CollisionWorld) {
+    // Add linear velocity to collider
+    pub fn add_linvel(&mut self, vel: Vector2, collision_world: &mut CollisionWorld) {
         let rigid_body = &mut collision_world.rapier.rigid_body_set[self.get_handles().0];
         rigid_body.apply_impulse(rapier2d::na::Vector2::from_raylib_vector2(vel), true);
+    }
+
+    // Add angular velocity to collider
+    pub fn add_angvel(&mut self, torque: f32, collision_world: &mut CollisionWorld) {
+        let rigid_body = &mut collision_world.rapier.rigid_body_set[self.get_handles().0];
+        rigid_body.apply_torque_impulse(torque, true);
+    }
+
+    // Set angular velocity to collider
+    pub fn set_angvel(&mut self, angvel: f32, collision_world: &mut CollisionWorld) {
+        let rigid_body = &mut collision_world.rapier.rigid_body_set[self.get_handles().0];
+        rigid_body.set_angvel(angvel, true);
+    }
+
+    pub fn get_linvel(&self, collision_world: &CollisionWorld) -> Vector2 {
+        let rigid_body = &collision_world.rapier.rigid_body_set[self.get_handles().0];
+        rigid_body.linvel().to_raylib_vector2()
+    }
+
+    pub fn get_angvel(&self, collision_world: &CollisionWorld) -> f32 {
+        let rigid_body = &collision_world.rapier.rigid_body_set[self.get_handles().0];
+        rigid_body.angvel()
     }
 
     pub fn get_pos(&self, collision_world: &CollisionWorld) -> Vector2 {
@@ -63,6 +86,11 @@ impl WorldColliderHandle {
     pub fn get_vel(&self, collision_world: &RapierCollisionWorld) -> Vector2 {
         let rigid_body = &collision_world.rigid_body_set[self.get_handles().0];
         rigid_body.linvel().to_raylib_vector2()
+    }
+
+    pub fn get_center_of_mass(&self, collision_world: &CollisionWorld) -> Vector2 {
+        let rigid_body = &collision_world.rapier.rigid_body_set[self.get_handles().0];
+        rigid_body.center_of_mass().coords.to_raylib_vector2()
     }
 
     pub fn get_mass(&self, collision_world: &RapierCollisionWorld) -> f32 {

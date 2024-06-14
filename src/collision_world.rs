@@ -20,6 +20,7 @@ impl CollisionWorld {
         &mut self,
         pos: Vector2,
         vel: Vector2,
+        density: f32,
         half_extents: Vector2,
         fixed: bool,
     ) -> WorldColliderHandle {
@@ -32,6 +33,7 @@ impl CollisionWorld {
         .build();
         let collider = ColliderBuilder::cuboid(half_extents.x, half_extents.y)
             .restitution(0.7)
+            .density(density)
             .active_events(ActiveEvents::COLLISION_EVENTS)
             .build();
         let rigid_body_handle = self.rapier.rigid_body_set.insert(rigid_body);
@@ -52,6 +54,7 @@ impl CollisionWorld {
         &mut self,
         pos: Vector2,
         vel: Vector2,
+        density: f32,
         radius: f32,
         fixed: bool,
     ) -> WorldColliderHandle {
@@ -64,6 +67,7 @@ impl CollisionWorld {
         .build();
         let collider = ColliderBuilder::ball(radius)
             .restitution(0.7)
+            .density(density)
             .active_events(ActiveEvents::COLLISION_EVENTS)
             .build();
         let rigid_body_handle = self.rapier.rigid_body_set.insert(rigid_body);
@@ -84,6 +88,7 @@ impl CollisionWorld {
         &mut self,
         pos: Vector2,
         vel: Vector2,
+        density: f32,
         points: (Vector2, Vector2, Vector2),
         fixed: bool,
     ) -> WorldColliderHandle {
@@ -100,6 +105,7 @@ impl CollisionWorld {
             rapier2d::na::Vector2::from_raylib_vector2(points.2).into(),
         )
         .restitution(0.7)
+        .density(density)
         .active_events(ActiveEvents::COLLISION_EVENTS)
         .build();
         let rigid_body_handle = self.rapier.rigid_body_set.insert(rigid_body);
@@ -120,6 +126,7 @@ impl CollisionWorld {
         &mut self,
         pos: Vector2,
         vel: Vector2,
+        density: f32,
         shapes: Shapes,
         fixed: bool,
     ) -> WorldColliderHandle {
@@ -130,7 +137,9 @@ impl CollisionWorld {
         .translation(rapier2d::na::Vector2::from_raylib_vector2(pos))
         .linvel(rapier2d::na::Vector2::from_raylib_vector2(vel))
         .build();
-        let collider = ColliderBuilder::compound(shapes);
+        let collider = ColliderBuilder::compound(shapes)
+        .restitution(0.7)
+        .density(density);
         let rigid_body_handle = self.rapier.rigid_body_set.insert(rigid_body);
         let collider_handle = self.rapier.collider_set.insert_with_parent(
             collider,
