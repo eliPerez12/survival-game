@@ -72,7 +72,7 @@ impl ImprovedCamera for Camera2D {
 
         if mouse_wheel_move != 0.0 {
             let old_world_pos = self.get_world_pos(self.offset, screen_size);
-            self.zoom *= 1.0 + rl.get_mouse_wheel_move() / 100.0;
+            self.zoom *= 1.0 + rl.get_mouse_wheel_move() / 50.0;
             self.track(old_world_pos, screen_size);
         }
     }
