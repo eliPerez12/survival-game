@@ -15,38 +15,119 @@ mod traits;
 mod world;
 mod world_collider;
 
+struct Player{
+    collider: WorldColliderHandle,
+}
+
+impl Player {
+    pub fn new(collision_world: &mut CollisionWorld) -> Self {
+        Player {
+            collider: collision_world.spawn_collider(
+                RigidBodyArgs {
+                    dynamic: true,
+                    pos: Vector2::new(2.0, 2.0),
+                    vel: Vector2::zero(),
+                },
+                ColliderArgs ::default(),
+                ShapeArgs::Ball {  radius: 1.0 },
+            )
+        }
+    }
+
+    fn handle_movement(&mut self, rl: &RaylibHandle, collision_world: &mut CollisionWorld) {
+        let player_acceleration = 0.01;
+        let player_stopping_power = 0.005;
+        let player_max_velocity: f32 = if rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) {
+            6.6
+        } else {
+            3.0
+        };
+        let mut player_input_movement = false;
+        let mut movement_vector = Vector2::new(0.0, 0.0);
+
+        if rl.is_key_down(KeyboardKey::KEY_W) {
+            movement_vector.y -= player_acceleration;
+            player_input_movement = true;
+        }
+        if rl.is_key_down(KeyboardKey::KEY_S) {
+            movement_vector.y += player_acceleration;
+            player_input_movement = true;
+        }
+        if rl.is_key_down(KeyboardKey::KEY_A) {
+            movement_vector.x -= player_acceleration;
+            player_input_movement = true;
+        }
+        if rl.is_key_down(KeyboardKey::KEY_D) {
+            movement_vector.x += player_acceleration;
+            player_input_movement = true;
+        }
+
+        if player_input_movement {
+            // Normalize the movement vector if diagonal movement occurs
+            if movement_vector.length() > player_acceleration {
+                movement_vector = movement_vector.normalized() * player_acceleration;
+            }
+
+            // Apply acceleration in the input direction
+            self.collider.add_linvel(movement_vector, collision_world);
+            
+            // Apply stopping power only to the components of the velocity that do not align with the input direction
+            let current_velocity = self.collider.get_linvel(collision_world);
+            let mut stopping_vector = current_velocity;
+
+            if movement_vector.x != 0.0 {
+                stopping_vector.x = 0.0; // No drag in the x-direction
+            } else {
+                stopping_vector.x *= player_stopping_power;
+            }
+
+            if movement_vector.y != 0.0 {
+                stopping_vector.y = 0.0; // No drag in the y-direction
+            } else {
+                stopping_vector.y *= player_stopping_power;
+            }
+
+            self.collider.add_linvel(-stopping_vector, collision_world);
+        } else {
+            // Apply stopping power when no input is detected
+            let current_velocity = self.collider.get_linvel(collision_world);
+            let stopping_vector = current_velocity * player_stopping_power;
+            self.collider.add_linvel(-stopping_vector, collision_world);
+        }
+
+        // Limit the player's velocity to the maximum velocity
+        let current_velocity = self.collider.get_linvel(collision_world);
+        if current_velocity.length() > player_max_velocity {
+            let capped_velocity = current_velocity.normalized() * player_max_velocity;
+            self.collider.set_linvel(capped_velocity, collision_world);
+        }
+    }
+}
+
 fn main() {
     let (mut rl, thread) = raylib::init().size(1080, 720).title("Physics").build();
     let mut camera = Camera2D {
-        offset: Vector2::new(100.0, 100.0),
-        zoom: 3.5,
+        offset: Vector2::new(0.0, 0.0),
+        zoom: 100.0,
         ..Default::default()
     };
 
     let mut collision_world = CollisionWorld::default();
     let mut debugger = DebugInfo::new();
-    add_bounds(&mut collision_world);
-    add_random_colliders(&mut collision_world, &rl);
+    let mut player = Player::new(&mut collision_world);
 
-    let mut player_collider = collision_world.spawn_compound(
+    let _debug_collider = collision_world.spawn_collider(
         RigidBodyArgs {
-            dynamic: true,
-            pos: Vector2::new(20.0, 20.0),
+            dynamic: false,
+            pos: Vector2::zero(),
             vel: Vector2::zero(),
         },
-        ColliderArgs::default(),
-        vec![
-            (
-                Vector2::zero(),
-                ShapeArgs::Cuboid {
-                    half_extents: Vector2::new(2.0, 2.0),
-                },
-            ),
-            (Vector2::new(2.0, 0.0), ShapeArgs::Ball { radius: 2.0 }),
-        ],
+        ColliderArgs ::default(),
+        ShapeArgs::Cuboid { half_extents: Vector2::new(1.0, 1.0) },
     );
 
-    let mut time_since_shot = 0.0;
+    let player_texture = rl.load_texture_from_image(&thread, &Image::load_image_from_mem(".png", include_bytes!("..//assets//rifle.png")).unwrap()).unwrap();
+
 
     while !rl.window_should_close() {
         /*
@@ -54,92 +135,14 @@ fn main() {
          */
 
         debugger.update(&mut rl);
+        player.handle_movement(&mut rl, &mut collision_world);
         camera.handle_camera_controls(&rl);
         camera.track(
-            player_collider.get_center_of_mass(&collision_world),
+            player.collider.get_center_of_mass(&collision_world),
             Vector2::new(rl.get_screen_width() as f32, rl.get_screen_height() as f32),
         );
-
-        let ang_vel = player_collider.get_angvel(&collision_world);
-        let rcs_torque = 2500.0;
-        let stabilizer_torque = 800.0;
-        let engine_force = 1000.0;
-
-        let mut player_moving_ship = false;
-
-        let player_pos = player_collider.get_pos(&collision_world);
-        time_since_shot += rl.get_frame_time();
-
-        if rl.is_key_down(KeyboardKey::KEY_SPACE) && time_since_shot > 0.1 {
-            time_since_shot = 0.0;
-            let angle = player_collider.get_angle(&collision_world);
-            let d = Vector2::new(angle.cos(), angle.sin());
-            collision_world.spawn_collider(
-                RigidBodyArgs {
-                    dynamic: true,
-                    pos: player_pos + d * 10.0,
-                    vel: d * 250.0,
-                },
-                ColliderArgs {
-                    density: 10.0,
-                    ..Default::default()
-                },
-                ShapeArgs::Ball { radius: 0.5 },
-            );
-        }
-        if rl.is_key_down(KeyboardKey::KEY_W) {
-            let angle = player_collider.get_angle(&collision_world);
-            let d = Vector2::new(angle.cos(), angle.sin());
-            player_collider.add_linvel(d * engine_force * rl.get_frame_time(), &mut collision_world)
-        }
-        if rl.is_key_down(KeyboardKey::KEY_E) {
-            let angle = player_collider.get_angle(&collision_world) + std::f32::consts::PI / 2.0;
-            let d = Vector2::new(angle.cos(), angle.sin());
-            player_collider.add_linvel(d * engine_force * rl.get_frame_time(), &mut collision_world)
-        }
-        if rl.is_key_down(KeyboardKey::KEY_Q) {
-            let angle = player_collider.get_angle(&collision_world) - std::f32::consts::PI / 2.0;
-            let d = Vector2::new(angle.cos(), angle.sin());
-            player_collider.add_linvel(d * engine_force * rl.get_frame_time(), &mut collision_world)
-        }
-        if rl.is_key_down(KeyboardKey::KEY_S) {
-            let angle = player_collider.get_angle(&collision_world);
-            let d = Vector2::new(angle.cos(), angle.sin());
-            player_collider.add_linvel(
-                -d * engine_force * rl.get_frame_time(),
-                &mut collision_world,
-            )
-        }
-        if rl.is_key_down(KeyboardKey::KEY_A) {
-            player_moving_ship = true;
-            player_collider.add_angvel(
-                -stabilizer_torque * rl.get_frame_time(),
-                &mut collision_world,
-            );
-        }
-        if rl.is_key_down(KeyboardKey::KEY_D) {
-            player_moving_ship = true;
-            player_collider.add_angvel(
-                stabilizer_torque * rl.get_frame_time(),
-                &mut collision_world,
-            );
-        }
-
-        if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_RIGHT) {
-            let mouse_angle = player_pos.angle_to(camera.to_world(rl.get_mouse_position()));
-            let ship_angle = player_collider.get_angle(&collision_world);
-            dbg!(mouse_angle, ship_angle);
-        }
-
-        if ang_vel > 0.0 && !player_moving_ship {
-            player_collider.add_angvel(-rcs_torque * rl.get_frame_time(), &mut collision_world)
-        }
-        if ang_vel < 0.0 && !player_moving_ship {
-            player_collider.add_angvel(rcs_torque * rl.get_frame_time(), &mut collision_world)
-        }
-        if ang_vel > rcs_torque && ang_vel < -rcs_torque {
-            player_collider.set_angvel(0.0, &mut collision_world)
-        }
+        
+         
 
         debugger.add(format!("FPS: {}", rl.get_fps()));
         debugger.add(format!(
@@ -148,12 +151,10 @@ fn main() {
         ));
         debugger.add(format!(
             "Player Speed: {:?} m/s",
-            player_collider.get_vel(&collision_world.rapier).length()
+            player.collider.get_vel(&collision_world).length()
         ));
 
-        player_collider.get_angle(&collision_world);
         collision_world.step(&rl);
-
         /*
          * Drawing
          */
@@ -164,7 +165,17 @@ fn main() {
         for collider in &collision_world.colliders {
             collider.draw(&collision_world, camera, &mut d);
         }
-        player_collider.draw(&collision_world, camera, &mut d);
+        //self.collider.draw(&collision_world, camera, &mut d);
+        let player_screen_pos = camera.to_screen(player.collider.get_pos(&collision_world));
+        let angle_to_mouse = player.collider.get_pos(&collision_world).angle_to(camera.to_world(d.get_mouse_position())).to_degrees() - 90.0;
+        d.draw_texture_pro(
+            &player_texture,
+            Rectangle::new(0.0, 0.0, player_texture.width() as f32, player_texture.height() as f32),
+            Rectangle::new(player_screen_pos.x, player_screen_pos.y, player_texture.width() as f32 / 10.0 * camera.zoom, player_texture.width() as f32 / 10.0 * camera.zoom),
+            Vector2::new(3.2 * camera.zoom, 3.2 * camera.zoom),
+            angle_to_mouse,
+            Color::WHITE,
+        );
 
         // UI
         debugger.draw(&mut d);

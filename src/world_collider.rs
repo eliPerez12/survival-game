@@ -68,6 +68,11 @@ impl WorldColliderHandle {
         rigid_body.set_angvel(angvel, true);
     }
 
+    pub fn set_linvel(&mut self, linvel: Vector2, collision_world: &mut CollisionWorld) {
+        let rigid_body = &mut collision_world.rapier.rigid_body_set[self.get_handles().0];
+        rigid_body.set_linvel(nalgebra::Vector2::from_raylib_vector2(linvel), true);
+    }
+
     pub fn get_linvel(&self, collision_world: &CollisionWorld) -> Vector2 {
         let rigid_body = &collision_world.rapier.rigid_body_set[self.get_handles().0];
         rigid_body.linvel().to_raylib_vector2()
@@ -83,8 +88,8 @@ impl WorldColliderHandle {
         rigid_body.position().translation.vector.to_raylib_vector2()
     }
 
-    pub fn get_vel(&self, collision_world: &RapierCollisionWorld) -> Vector2 {
-        let rigid_body = &collision_world.rigid_body_set[self.get_handles().0];
+    pub fn get_vel(&self, collision_world: &CollisionWorld) -> Vector2 {
+        let rigid_body = &collision_world.rapier.rigid_body_set[self.get_handles().0];
         rigid_body.linvel().to_raylib_vector2()
     }
 
