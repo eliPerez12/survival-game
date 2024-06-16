@@ -6,34 +6,50 @@ use crate::ImprovedCamera;
 use crate::RaylibVector2;
 use raylib::prelude::*;
 
-struct Corpse {
-    pos: Vector2,
-    animation_stage: i32,
-    time_elapsed: f32,
-    angle: f32,
+// TODO: make private
+pub struct Corpse {
+    pub pos: Vector2,
+    pub animation_stage: i32,
+    pub time_elapsed: f32,
+    pub angle: f32,
 }
 
 impl Corpse {
-    pub fn update_animation() {
+    const ANIMATION_FRAME_TIME: f32 = 0.1;
+    pub fn update_animation(&mut self, rl: &RaylibHandle) {
+        if (1..4).contains(&self.animation_stage) {
+            if self.time_elapsed > Self::ANIMATION_FRAME_TIME {
+                self.animation_stage += 1;
+                self.time_elapsed = 0.0;
+            } else {
+                self.time_elapsed += rl.get_frame_time();
+            }
+        }
 
     }
 
-    pub fn render(&self, d: &mut RaylibDrawHandle, corpse_texture: &Texture2D, camera: &Camera2D) {
+    pub fn render(&self, d: &mut RaylibDrawHandle, assets: &Assets, camera: &Camera2D) {
+        let corpse_texture = assets.get_texture(&format!("corpses/corpse{}.png", self.animation_stage));
+        let scale = 0.1;
+        //d.draw_circle_v(camera.to_screen(self.pos), 1.0 * camera.zoom, Color::WHITE);
         d.draw_texture_pro(
             corpse_texture,
             Rectangle::new(
                 0.0,
                 0.0,
                 corpse_texture.width() as f32,
-                corpse_texture.height() as f32
+                corpse_texture.height() as f32,
             ),
             camera.to_screen_rect(&Rectangle::new(
                 self.pos.x,
                 self.pos.y,
-                corpse_texture.width() as f32 / 10.0,
-                corpse_texture.width() as f32 / 10.0,
+                corpse_texture.width() as f32 * scale,
+                corpse_texture.width() as f32 * scale,
             )),
-            Vector2::new(3.2 * camera.zoom, 3.2 * camera.zoom),
+            Vector2::new(
+                corpse_texture.width() as f32 * scale / 2.0 * camera.zoom,
+                corpse_texture.height() as f32 * scale / 2.0 * camera.zoom,
+            ),
             self.angle,
             Color::WHITE,
         );
@@ -42,6 +58,7 @@ impl Corpse {
 
 pub struct Player {
     pub collider: WorldColliderHandle,
+    pub angle: f32,
     pub health: f32,
 }
 
@@ -59,10 +76,21 @@ impl Player {
                 ShapeArgs::Ball { radius: 1.0 },
             ),
             health: 100.0,
+            angle: 0.0,
         }
     }
 
-    pub fn control_movement(&mut self, rl: &RaylibHandle, collision_world: &mut CollisionWorld) {
+    pub fn aim_at(&mut self, world_pos: Vector2, collision_world: &mut CollisionWorld) {
+        self.angle = self
+        .collider
+        .get_pos(collision_world)
+        .angle_to(world_pos)
+        .to_degrees()
+        - 90.0;
+
+    }
+
+    pub fn control_movement(&mut self, rl: &RaylibHandle, camera: &Camera2D, collision_world: &mut CollisionWorld) {
         let mut movement_vector = Vector2::new(0.0, 0.0);
         if rl.is_key_down(KeyboardKey::KEY_W) {
             movement_vector.y -= 1.0;
@@ -76,7 +104,13 @@ impl Player {
         if rl.is_key_down(KeyboardKey::KEY_D) {
             movement_vector.x += 1.0;
         }
-        self.handle_movement(rl, collision_world, &mut movement_vector);
+        self.angle = self
+        .collider
+        .get_pos(collision_world)
+        .angle_to(camera.to_world(rl.get_mouse_position()))
+        .to_degrees()
+        - 90.0;
+        self.handle_movement(rl,collision_world, &mut movement_vector);
     }
 
     pub fn handle_movement(
@@ -161,7 +195,7 @@ impl Player {
     ) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             let d = (aimed_at - self.collider.get_pos(collision_world)).normalized();
-            let bullet_speed = 110.0;
+            let bullet_speed = 75.0;
             let bullet_radius = 0.1;
             bullets.push(collision_world.spawn_collider(
                 RigidBodyArgs {
@@ -172,7 +206,7 @@ impl Player {
                 },
                 ColliderArgs {
                     density: 1.5,
-                    restitution: 0.01,
+                    restitution: 0.1,
                     friction: 0.7,
                     user_data: ColliderUserData::BULLET,
                 },
@@ -208,16 +242,9 @@ impl Player {
         camera: &Camera2D,
         collision_world: &mut CollisionWorld,
         assets: &Assets,
-        aimed_at: Vector2,
     ) {
         let player_texture = assets.get_texture("rifle.png");
         let player_pos = self.collider.get_pos(collision_world);
-        let angle_to_mouse = self
-            .collider
-            .get_pos(collision_world)
-            .angle_to(camera.to_world(aimed_at))
-            .to_degrees()
-            - 90.0;
         
         let scale = 0.1;
         d.draw_texture_pro(
@@ -231,14 +258,14 @@ impl Player {
             camera.to_screen_rect(&Rectangle::new(
                 player_pos.x,
                 player_pos.y,
-                player_texture.width() as f32  * scale,
-                player_texture.width() as f32  * scale,
+                player_texture.width() as f32 * scale,
+                player_texture.width() as f32 * scale,
             )),
             Vector2::new(
                 player_texture.width() as f32 * scale / 2.0 * camera.zoom,
                 player_texture.height() as f32 * scale / 2.0 * camera.zoom,
             ),
-            angle_to_mouse,
+            self.angle,
             Color::WHITE,
         );
         let font_size = 1.0;
@@ -249,5 +276,9 @@ impl Player {
             (1.0 * camera.zoom) as i32,
             Color::WHITE,
         );
+    }
+
+    pub fn get_corpse(&self, collision_world: &mut CollisionWorld) -> Corpse {
+            Corpse { pos: self.collider.get_pos(collision_world), animation_stage: 1, time_elapsed: 0.0, angle: self.angle }
     }
 }

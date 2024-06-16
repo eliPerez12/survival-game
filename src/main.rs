@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fmt::format;
 
 use crate::player::*;
 use crate::rapier_world::*;
@@ -27,11 +26,21 @@ impl Assets {
     pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
         Assets {
             textures: Self::load_assets_in_dir(rl, thread, "assets".to_string()),
-            error_texture: rl.load_texture_from_image(&thread, &Image::load_image_from_mem(".png", include_bytes!("../assets/error.png")).unwrap()).unwrap()
+            error_texture: rl
+                .load_texture_from_image(
+                    thread,
+                    &Image::load_image_from_mem(".png", include_bytes!("../assets/error.png"))
+                        .unwrap(),
+                )
+                .unwrap(),
         }
     }
 
-    fn load_assets_in_dir(rl: &mut RaylibHandle, thread: &RaylibThread, path: String) -> HashMap<String, Texture2D>{
+    fn load_assets_in_dir(
+        rl: &mut RaylibHandle,
+        thread: &RaylibThread,
+        path: String,
+    ) -> HashMap<String, Texture2D> {
         let mut assets = HashMap::new();
         let dir = std::fs::read_dir(path.clone()).unwrap();
         for entry in dir {
@@ -41,15 +50,21 @@ impl Assets {
             if entry.file_type().unwrap().is_dir() {
                 assets.extend(Self::load_assets_in_dir(rl, thread, full_path));
             } else {
-                let texture_name = full_path.split_off(7);                                                         
-                assets.insert(texture_name, rl.load_texture(thread, &format!("{}/{}", path, file_name)).unwrap());
+                let texture_name = full_path.split_off(7);
+                assets.insert(
+                    texture_name,
+                    rl.load_texture(thread, &format!("{}/{}", path, file_name))
+                        .unwrap(),
+                );
             }
         }
         assets
     }
 
     pub fn get_texture(&self, texture_name: &str) -> &Texture2D {
-        self.textures.get(texture_name).or(Some(&self.error_texture)).unwrap()
+        self.textures
+            .get(texture_name)
+            .unwrap_or(&self.error_texture)
     }
 }
 
@@ -79,10 +94,10 @@ fn main() {
          */
         let mouse_pos = rl.get_mouse_position();
         debugger.update(&mut rl);
-        collision_world.step(&rl);
         player.apply_collision_damage(&mut collision_world, &mut game_world.bullets);
-        game_world.apply_damage_dummies(&mut rl, &mut collision_world);
-        player.control_movement(&rl, &mut collision_world);
+        game_world.handle_corpses(&rl);
+        game_world.handle_dummies(&mut rl, &player, &mut collision_world);
+        player.control_movement(&rl, &camera, &mut collision_world);
         player.handle_shooting(
             &mut rl,
             &mut collision_world,
@@ -97,12 +112,7 @@ fn main() {
         player.handle_spawning_dunmmies(&rl, &camera, &mut collision_world, &mut game_world);
         game_world.handle_bullet_physics(&rl, &mut collision_world);
 
-        debugger.add(format!("Game FPS: {}", rl.get_fps()));
-        debugger.add(format!(
-            "Num Colliders: {}",
-            collision_world.rapier.rigid_body_set.len()
-        ));
-        debugger.add(format!("Health: {:?} ", player.health));
+        collision_world.step(&rl);
 
         /*
          * Drawing
@@ -115,24 +125,25 @@ fn main() {
         for debug_collider in &debug_colliders {
             debug_collider.draw(&collision_world, &camera, &mut d);
         }
-        game_world.render_dummies(
-            &player,
-            &camera,
-            &mut collision_world,
-            &mut d,
-            &assets,
-        );
-        player.render(
-            &mut d,
-            &camera,
-            &mut collision_world,
-            &assets,
-            mouse_pos,
-        );
+        game_world.render_corpses(&camera, &mut d, &assets);
+        game_world.render_dummies(&player, &camera, &mut collision_world, &mut d, &assets);
+        player.render(&mut d, &camera, &mut collision_world, &assets);
+
+        // Debugger
+        debugger.add(format!("Game FPS: {}", d.get_fps()));
+        debugger.add(format!(
+            "Num Colliders: {}",
+            collision_world.rapier.rigid_body_set.len()
+        ));
+        debugger.add(format!("Health: {:?} ", player.health));
         debugger.add(format!(
             "Mouse_pos: ({:?}, {:?})",
-            camera.to_world(mouse_pos).x as i32,
-            camera.to_world(mouse_pos).y as i32
+            camera.to_world(mouse_pos).x,
+            camera.to_world(mouse_pos).y,
+        ));
+        debugger.add(format!(
+            "Corpses: {:?}",
+            game_world.corpses.len(),
         ));
 
         // UI

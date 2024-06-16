@@ -15,19 +15,22 @@ pub struct WorldColliderHandle {
 }
 
 impl WorldColliderHandle {
-    // Add linear velocity to collider
     pub fn apply_impulse(&self, vel: Vector2, collision_world: &mut CollisionWorld) {
         let rigid_body = &mut collision_world.rapier.rigid_body_set[self.rigid_body_handle];
         rigid_body.apply_impulse(rapier2d::na::Vector2::from_raylib_vector2(vel), true)
     }
 
-    // Add angular velocity to collider
-    pub fn add_angvel(&self, torque: f32, collision_world: &mut CollisionWorld) {
+    pub fn add_linvel(&self, vel: Vector2, collision_world: &mut CollisionWorld) {
+        let mass = self.get_mass(collision_world);
+        let rigid_body = &mut collision_world.rapier.rigid_body_set[self.rigid_body_handle];
+        rigid_body.apply_impulse(rapier2d::na::Vector2::from_raylib_vector2(vel * mass), true)
+    }
+
+    pub fn apply_angular_impulse(&self, torque: f32, collision_world: &mut CollisionWorld) {
         let rigid_body = &mut collision_world.rapier.rigid_body_set[self.rigid_body_handle];
         rigid_body.apply_torque_impulse(torque, false);
     }
 
-    // Set angular velocity to collider
     pub fn set_angvel(&self, angvel: f32, collision_world: &mut CollisionWorld) {
         let rigid_body = &mut collision_world.rapier.rigid_body_set[self.rigid_body_handle];
         rigid_body.set_angvel(angvel, true);
@@ -43,11 +46,6 @@ impl WorldColliderHandle {
             .set_position(nalgebra::Vector2::from_raylib_vector2(pos).into(), true)
     }
 
-    pub fn get_linvel(&self, collision_world: &CollisionWorld) -> Vector2 {
-        let rigid_body = &collision_world.rapier.rigid_body_set[self.rigid_body_handle];
-        rigid_body.linvel().to_raylib_vector2()
-    }
-
     pub fn get_angvel(&self, collision_world: &CollisionWorld) -> f32 {
         let rigid_body = &collision_world.rapier.rigid_body_set[self.rigid_body_handle];
         rigid_body.angvel()
@@ -58,7 +56,7 @@ impl WorldColliderHandle {
         rigid_body.position().translation.vector.to_raylib_vector2()
     }
 
-    pub fn get_vel(&self, collision_world: &CollisionWorld) -> Vector2 {
+    pub fn get_linvel(&self, collision_world: &CollisionWorld) -> Vector2 {
         let rigid_body = &collision_world.rapier.rigid_body_set[self.rigid_body_handle];
         rigid_body.linvel().to_raylib_vector2()
     }

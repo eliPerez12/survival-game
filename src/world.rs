@@ -1,10 +1,13 @@
-use crate::{collision_world::*, traits::*, world_collider::WorldColliderHandle, Assets, Player};
+use crate::{
+    collision_world::*, traits::*, world_collider::WorldColliderHandle, Assets, Corpse, Player,
+};
 use rand::Rng;
 use raylib::prelude::*;
 
 pub struct GameWorld {
     pub bullets: Vec<WorldColliderHandle>,
     pub dummies: Vec<Player>,
+    pub corpses: Vec<Corpse>,
 }
 
 impl GameWorld {
@@ -12,18 +15,32 @@ impl GameWorld {
         GameWorld {
             bullets: vec![],
             dummies: vec![],
+            corpses: vec![],
         }
     }
 
-    pub fn apply_damage_dummies(
+    pub fn handle_corpses(&mut self, rl: &RaylibHandle) {
+        for corpse in &mut self.corpses {
+            corpse.update_animation(rl);
+        }
+    }
+
+    pub fn handle_dummies(
         &mut self,
         rl: &mut RaylibHandle,
+        player: &Player,
         collision_world: &mut CollisionWorld,
     ) {
         for dummy in &mut self.dummies {
             dummy.apply_collision_damage(collision_world, &mut self.bullets);
             dummy.handle_movement(rl, collision_world, &mut Vector2::zero());
+            dummy.aim_at(player.collider.get_pos(collision_world), collision_world);
+            if dummy.health <= 0.0 {
+                self.corpses.push(dummy.get_corpse(collision_world));
+                collision_world.delete_collider(dummy.collider.clone());
+            }
         }
+        self.dummies.retain(|dummy| dummy.health > 0.0)
     }
 
     pub fn handle_bullet_physics(
@@ -31,15 +48,15 @@ impl GameWorld {
         rl: &RaylibHandle,
         collision_world: &mut CollisionWorld,
     ) {
+        let drag_amount = 50.0;
         for bullet in &mut self.bullets {
-            let bullet_speed = bullet.get_vel(collision_world);
-            let bullet_inerta = bullet_speed * bullet.get_mass(collision_world);
-            let drag = 1.1;
-            bullet.apply_impulse(-bullet_inerta / drag * rl.get_frame_time(), collision_world)
+            let drag_dir = -bullet.get_linvel(collision_world).normalized();
+            let drag_vector = drag_dir * drag_amount * rl.get_frame_time();
+            bullet.add_linvel(drag_vector, collision_world)
         }
 
         self.bullets.retain(|bullet_handle| {
-            if bullet_handle.get_vel(collision_world).length() < 3.5 {
+            if bullet_handle.get_linvel(collision_world).length() < drag_amount * rl.get_frame_time() {
                 collision_world.delete_collider(bullet_handle.clone());
                 false
             } else {
@@ -71,6 +88,25 @@ impl GameWorld {
         }
     }
 
+    pub fn render_corpses(
+        &self,
+        camera: &Camera2D,
+        d: &mut RaylibDrawHandle,
+        assets: &Assets,
+    ) {
+        let camera_world_rect = camera.to_world_rect(&Rectangle::new(
+            0.0,
+            0.0,
+            d.get_screen_width() as f32 * 1.25,
+            d.get_screen_height() as f32 * 1.25,
+        ));
+        for corpse in &self.corpses {
+            if camera_world_rect.check_collision_point_rec(corpse.pos) {
+                corpse.render(d, assets, camera)
+            }
+        }
+    }
+
     pub fn render_dummies(
         &self,
         player: &Player,
@@ -79,7 +115,6 @@ impl GameWorld {
         d: &mut RaylibDrawHandle,
         assets: &Assets,
     ) {
-        let player_screen_pos = camera.to_screen(player.collider.get_pos(collision_world));
         let camera_world_rect = camera.to_world_rect(&Rectangle::new(
             0.0,
             0.0,
@@ -132,13 +167,7 @@ impl GameWorld {
                         Color::YELLOW,
                     );
                 } else {
-                    dummy.render(
-                        d,
-                        camera,
-                        collision_world,
-                        assets,
-                        player_screen_pos,
-                    );
+                    dummy.render(d, camera, collision_world, assets);
                 }
             }
         }
@@ -164,7 +193,7 @@ pub fn spawn_debug_colldier_world(
             ColliderArgs {
                 density: 1.0,
                 restitution: 0.5,
-                friction: 0.7,
+                friction: 0.5,
                 user_data: ColliderUserData::WALL,
             },
             ShapeArgs::Cuboid {
