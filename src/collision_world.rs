@@ -10,10 +10,18 @@ pub struct CollisionWorld {
     pub rapier: RapierCollisionWorld, //TODO: Make private
 }
 
+pub struct ColliderUserData;
+
+impl ColliderUserData {
+    pub const BULLET: u128 = 2;
+}
+
+
 pub struct RigidBodyArgs {
     pub dynamic: bool,
     pub pos: Vector2,
     pub vel: Vector2,
+    pub user_data: u128,
 }
 
 impl RigidBodyArgs {
@@ -24,6 +32,7 @@ impl RigidBodyArgs {
         }
         .translation(rapier2d::na::Vector2::from_raylib_vector2(self.pos))
         .linvel(rapier2d::na::Vector2::from_raylib_vector2(self.vel))
+        .user_data(self.user_data)
         .build()
     }
 }

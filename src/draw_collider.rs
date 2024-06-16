@@ -1,5 +1,5 @@
-use crate::{traits::*, RapierCollisionWorld, WorldColliderHandle};
-use rapier2d::na::{Isometry, Isometry2, UnitComplex};
+use crate::traits::*;
+use rapier2d::na::{Isometry, UnitComplex};
 use rapier2d::prelude::*;
 use raylib::prelude::*;
 
@@ -41,29 +41,9 @@ pub fn draw_shape(
             color,
         );
     } else if let Some(collider) = isometry_shape.1.as_compound() {
-        unimplemented!()
+        for (mut isometery, shape) in collider.shapes() {
+            isometery.translation.vector += isometry_shape.0.translation.vector;
+            draw_shape((isometery, &*shape.0), color, d, camera);
+        }
     }
-}
-
-pub fn draw_cuboid(
-    isometry_shape: IsometryShape,
-    color: Color,
-    d: &mut RaylibDrawHandle,
-    camera: &Camera2D,
-) {
-    let collider = isometry_shape.1.as_cuboid().unwrap();
-    let half_extents = collider.half_extents.to_raylib_vector2();
-    let pos = isometry_shape.0.translation.vector.to_raylib_vector2();
-    let angle = isometry_shape.0.rotation.angle().to_degrees();
-    d.draw_rectangle_pro(
-        Rectangle {
-            x: camera.to_screen_x(pos.x),
-            y: camera.to_screen_y(pos.y),
-            width: half_extents.x * 2.0 * camera.zoom,
-            height: half_extents.y * 2.0 * camera.zoom,
-        },
-        half_extents * camera.zoom,
-        angle,
-        color,
-    );
 }

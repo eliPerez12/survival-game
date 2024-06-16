@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use ease::quad_in;
 use rapier2d::parry::bounding_volume::BoundingSphere;
 use rapier2d::prelude::*;
 use raylib::prelude::*;
@@ -16,7 +17,7 @@ pub struct WorldColliderHandle {
 
 impl WorldColliderHandle {
     // Add linear velocity to collider
-    pub fn add_linvel(&self, vel: Vector2, collision_world: &mut CollisionWorld) {
+    pub fn apply_impulse(&self, vel: Vector2, collision_world: &mut CollisionWorld) {
         let rigid_body = &mut collision_world.rapier.rigid_body_set[self.rigid_body_handle];
         rigid_body.apply_impulse(rapier2d::na::Vector2::from_raylib_vector2(vel), true)
     }
@@ -36,6 +37,10 @@ impl WorldColliderHandle {
     pub fn set_linvel(&self, linvel: Vector2, collision_world: &mut CollisionWorld) {
         let rigid_body = &mut collision_world.rapier.rigid_body_set[self.rigid_body_handle];
         rigid_body.set_linvel(nalgebra::Vector2::from_raylib_vector2(linvel), true);
+    }
+
+    pub fn set_pos(&self, pos: Vector2, collision_world: &mut CollisionWorld) {
+        collision_world.rapier.rigid_body_set[self.rigid_body_handle].set_position(nalgebra::Vector2::from_raylib_vector2(pos).into(), true)
     }
 
     pub fn get_linvel(&self, collision_world: &CollisionWorld) -> Vector2 {

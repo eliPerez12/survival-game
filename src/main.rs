@@ -1,11 +1,9 @@
 use collision_world::*;
 use debug::DebugInfo;
 use raylib::prelude::*;
-use world::*;
-use world_collider::WorldColliderHandle;
-
 use crate::rapier_world::*;
 use crate::traits::*;
+use crate::player::*;
 
 mod collision_world;
 mod debug;
@@ -14,75 +12,29 @@ mod rapier_world;
 mod traits;
 mod world;
 mod world_collider;
+mod player;
 
-struct Player {
-    collider: WorldColliderHandle,
-}
-
-impl Player {
-    pub fn new(collision_world: &mut CollisionWorld) -> Self {
-        Player {
-            collider: collision_world.spawn_collider(
-                RigidBodyArgs {
-                    dynamic: true,
-                    pos: Vector2::new(2.0, 2.0),
-                    vel: Vector2::zero(),
-                },
-                ColliderArgs::default(),
-                ShapeArgs::Ball { radius: 1.0 },
-            ),
-        }
-    }
-
-    fn handle_movement(&mut self, rl: &RaylibHandle, collision_world: &mut CollisionWorld) {
-        let player_max_speed = match rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) {
-            false => 3.0,
-            true => 6.0,
-        };
-        let player_speed = 25.0;
-        let player_acceleration = player_speed * rl.get_frame_time();
-        let player_drag = player_speed / player_max_speed * rl.get_frame_time();
-        let mut movement_vector = Vector2::new(0.0, 0.0);
-        let drag_vector = -self.collider.get_linvel(collision_world);
-        self.collider
-            .add_linvel(drag_vector * player_drag, collision_world);
-
-        if rl.is_key_down(KeyboardKey::KEY_W) {
-            movement_vector.y -= 1.0;
-        }
-        if rl.is_key_down(KeyboardKey::KEY_S) {
-            movement_vector.y += 1.0;
-        }
-        if rl.is_key_down(KeyboardKey::KEY_A) {
-            movement_vector.x -= 1.0;
-        }
-        if rl.is_key_down(KeyboardKey::KEY_D) {
-            movement_vector.x += 1.0;
-        }
-        movement_vector.normalize();
-        self.collider
-            .add_linvel(movement_vector * player_acceleration, collision_world);
-    }
-}
 
 fn main() {
-    let (mut rl, thread) = raylib::init().size(1080, 720).title("Physics").build();
+    let (mut rl, thread) = raylib::init().size(1080, 720).title("Physics").vsync().build();
     let mut camera = Camera2D {
         offset: Vector2::new(0.0, 0.0),
         zoom: 100.0,
         ..Default::default()
     };
-
     let mut collision_world = CollisionWorld::default();
     let mut debugger = DebugInfo::new();
     let mut player = Player::new(&mut collision_world);
     let mut bullets = Vec::with_capacity(1000);
+
+    let mut dummies: Vec<Player> = vec![];
 
     let debug_collider = collision_world.spawn_collider(
         RigidBodyArgs {
             dynamic: false,
             pos: Vector2::zero(),
             vel: Vector2::zero(),
+            user_data: 0
         },
         ColliderArgs {
             density: 1.0,
@@ -93,6 +45,7 @@ fn main() {
             half_extents: Vector2::new(1.0, 10.0),
         },
     );
+    
 
     let player_texture = rl
         .load_texture_from_image(
@@ -105,10 +58,14 @@ fn main() {
         /*
          * Update
          */
-
-        collision_world.step(&rl);
         debugger.update(&mut rl);
-        player.handle_movement(&rl, &mut collision_world);
+        collision_world.step(&rl);
+        player.apply_collision_damage(&mut collision_world, &mut bullets);
+        for dummy in &mut dummies {
+            dummy.apply_collision_damage(&mut collision_world, &mut bullets);
+            dummy.handle_movement(&rl, &mut collision_world, &mut Vector2::zero());
+        }
+        player.control_movement(&rl, &mut collision_world);
         camera.handle_camera_controls(&rl);
         camera.track(
             player.collider.get_center_of_mass(&collision_world),
@@ -119,16 +76,17 @@ fn main() {
             let d = (camera.to_world(rl.get_mouse_position())
                 - player.collider.get_pos(&collision_world))
             .normalized();
-            let bullet_speed = 110.0;
+            let bullet_speed = 140.0;
             let bullet_radius = 0.1;
             bullets.push(collision_world.spawn_collider(
                 RigidBodyArgs {
                     dynamic: true,
                     pos: player.collider.get_pos(&collision_world) + d * 1.5,
                     vel: d * bullet_speed + player.collider.get_linvel(&collision_world),
+                    user_data: ColliderUserData::BULLET,
                 },
                 ColliderArgs {
-                    density: 1.0,
+                    density: 1.5,
                     restitution: 0.0,
                     friction: 0.0,
                 },
@@ -138,17 +96,28 @@ fn main() {
             ));
         }
 
+        if rl.is_key_pressed(KeyboardKey::KEY_G) {
+            dummies.push(
+                {
+                    let dummy = Player::new(&mut collision_world);
+                    dummy.collider.set_pos(camera.to_world(rl.get_mouse_position()), &mut collision_world);
+                    dummy
+                }
+            )
+        }
+
         for bullet in &mut bullets {
             let bullet_speed = bullet.get_vel(&collision_world);
-            let drag = 30.0;
-            bullet.add_linvel(
-                -bullet_speed / (drag / rl.get_frame_time()),
+            let bullet_inerta = bullet_speed * bullet.get_mass(&collision_world);
+            let drag = 1.1;
+            bullet.apply_impulse(
+                -bullet_inerta/drag*rl.get_frame_time(),
                 &mut collision_world,
             )
         }
 
         bullets.retain(|bullet_handle| {
-            if bullet_handle.get_vel(&collision_world).length() < 8.0 {
+            if bullet_handle.get_vel(&collision_world).length() < 5.0 {
                 collision_world.delete_collider(bullet_handle.clone());
                 false
             } else {
@@ -168,6 +137,10 @@ fn main() {
         debugger.add(format!(
             "Player Speed: {:?} m/s",
             player.collider.get_vel(&collision_world).length()
+        ));
+        debugger.add(format!(
+            "Health: {:?} ",
+            player.health
         ));
 
         /*
@@ -195,32 +168,12 @@ fn main() {
             }
         }
         debug_collider.draw(&collision_world, camera, &mut d);
-        let player_pos = player.collider.get_pos(&collision_world);
-        let angle_to_mouse = player
-            .collider
-            .get_pos(&collision_world)
-            .angle_to(camera.to_world(d.get_mouse_position()))
-            .to_degrees()
-            - 90.0;
-        d.draw_texture_pro(
-            &player_texture,
-            Rectangle::new(
-                0.0,
-                0.0,
-                player_texture.width() as f32,
-                player_texture.height() as f32,
-            ),
-            camera.to_screen_rect(&Rectangle::new(
-                player_pos.x,
-                player_pos.y,
-                player_texture.width() as f32 / 10.0,
-                player_texture.width() as f32 / 10.0,
-            )),
-            Vector2::new(3.2 * camera.zoom, 3.2 * camera.zoom),
-            angle_to_mouse,
-            Color::WHITE,
-        );
-
+        let player_screen_pos = camera.to_screen(player.collider.get_pos(&collision_world));
+        let mouse_pos = d.get_mouse_position();
+        for dummy in &dummies {
+            dummy.render(&mut d, &camera, &mut collision_world, &player_texture, player_screen_pos)
+        }
+        player.render(&mut d, &camera, &mut collision_world, &player_texture, mouse_pos);
         debugger.add(format!("Drawing colliders: {:?}", rendering_colliders));
 
         // UI
