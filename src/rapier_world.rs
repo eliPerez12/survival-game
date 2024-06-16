@@ -7,23 +7,22 @@ use rapier2d::{
 
 pub const GRAVITY: f32 = 0.0;
 
-// TODO: Make all fields private
 pub struct RapierCollisionWorld {
-    physics_pipeline: PhysicsPipeline,
-    gravity: Vector<Real>,
+    pub physics_pipeline: PhysicsPipeline,
+    pub gravity: Vector<Real>,
     pub integration_parameters: IntegrationParameters,
     pub island_manager: IslandManager,
-    broad_phase: BroadPhase,
+    pub broad_phase: BroadPhase,
     pub narrow_phase: NarrowPhase,
     pub rigid_body_set: RigidBodySet,
     pub collider_set: ColliderSet,
     pub impulse_joint_set: ImpulseJointSet,
     pub multibody_joint_set: MultibodyJointSet,
-    ccd_solver: CCDSolver,
-    query_pipeline: QueryPipeline,
-    event_handler: ChannelEventCollector,
-    collision_recv: Receiver<CollisionEvent>,
-    contact_force_recv: Receiver<ContactForceEvent>,
+    pub ccd_solver: CCDSolver,
+    pub query_pipeline: QueryPipeline,
+    pub event_handler: ChannelEventCollector,
+    pub collision_recv: Receiver<CollisionEvent>,
+    pub contact_force_recv: Receiver<ContactForceEvent>,
     pub accumulated_time: f32,
 }
 

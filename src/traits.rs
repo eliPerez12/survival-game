@@ -46,7 +46,6 @@ impl ImprovedCamera for Camera2D {
         }
     }
 
-
     fn to_world(&self, screen_pos: Vector2) -> Vector2 {
         (screen_pos / self.zoom) - self.offset
     }

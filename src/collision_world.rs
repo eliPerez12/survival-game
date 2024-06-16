@@ -16,7 +16,6 @@ impl ColliderUserData {
     pub const BULLET: u128 = 2;
 }
 
-
 pub struct RigidBodyArgs {
     pub dynamic: bool,
     pub pos: Vector2,

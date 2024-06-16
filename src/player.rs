@@ -1,8 +1,8 @@
-use raylib::prelude::*;
-use crate::world_collider::*;
 use crate::collision_world::*;
+use crate::world_collider::*;
 use crate::ImprovedCamera;
 use crate::RaylibVector2;
+use raylib::prelude::*;
 
 pub struct Player {
     pub collider: WorldColliderHandle,
@@ -17,7 +17,7 @@ impl Player {
                     dynamic: true,
                     pos: Vector2::new(2.0, 2.0),
                     vel: Vector2::zero(),
-                    user_data: 0
+                    user_data: 0,
                 },
                 ColliderArgs::default(),
                 ShapeArgs::Ball { radius: 1.0 },
@@ -41,10 +41,14 @@ impl Player {
             movement_vector.x += 1.0;
         }
         self.handle_movement(rl, collision_world, &mut movement_vector);
-
     }
 
-    pub fn handle_movement(&mut self, rl: &RaylibHandle, collision_world: &mut CollisionWorld, movement_vector: &mut Vector2) {
+    pub fn handle_movement(
+        &mut self,
+        rl: &RaylibHandle,
+        collision_world: &mut CollisionWorld,
+        movement_vector: &mut Vector2,
+    ) {
         let player_speed = 25.0 * self.collider.get_mass(collision_world);
         let player_acceleration = player_speed * rl.get_frame_time();
         let player_max_speed = match rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) {
@@ -60,33 +64,49 @@ impl Player {
             .apply_impulse(*movement_vector * player_acceleration, collision_world);
     }
 
-    pub fn apply_collision_damage(&mut self, collision_world: &mut CollisionWorld, bullets: &mut Vec<WorldColliderHandle>) {
+    pub fn apply_collision_damage(
+        &mut self,
+        collision_world: &mut CollisionWorld,
+        bullets: &mut Vec<WorldColliderHandle>,
+    ) {
         let mut bullet = None;
-        for collision in collision_world.rapier.narrow_phase.contact_pairs_with(self.collider.collider_handle) {
+        for collision in collision_world
+            .rapier
+            .narrow_phase
+            .contact_pairs_with(self.collider.collider_handle)
+        {
             let other_collider_handle = if self.collider.collider_handle == collision.collider1 {
                 collision.collider2
             } else {
                 collision.collider1
             };
-            let other_collider = &collision_world.rapier.collider_set.get(other_collider_handle);
+            let other_collider = &collision_world
+                .rapier
+                .collider_set
+                .get(other_collider_handle);
             if other_collider.is_none() {
-                break
+                break;
             }
             let other_collider = other_collider.unwrap();
             let other_rigid_body_handle = other_collider.parent().unwrap();
             let other_rigid_body = &collision_world.rapier.rigid_body_set[other_rigid_body_handle];
             let other_collider_speed = other_rigid_body.linvel().to_raylib_vector2().length();
             let player_deflection_level = 50.0;
-            if other_rigid_body.user_data == ColliderUserData::BULLET && dbg!(other_collider_speed) > player_deflection_level {
+            if other_rigid_body.user_data == ColliderUserData::BULLET
+                && dbg!(other_collider_speed) > player_deflection_level
+            {
                 let bullet_damage = (other_collider_speed - player_deflection_level).min(25.0);
                 self.health -= dbg!(bullet_damage);
-                bullet = Some((WorldColliderHandle {
-                    rigid_body_handle: other_rigid_body_handle,
-                    collider_handle: other_collider_handle
-                }, 
-                other_rigid_body.linvel().to_raylib_vector2().normalized() * other_collider_speed * other_collider.mass()
-            ));
-                break
+                bullet = Some((
+                    WorldColliderHandle {
+                        rigid_body_handle: other_rigid_body_handle,
+                        collider_handle: other_collider_handle,
+                    },
+                    other_rigid_body.linvel().to_raylib_vector2().normalized()
+                        * other_collider_speed
+                        * other_collider.mass(),
+                ));
+                break;
             }
         }
         if let Some((bullet, force)) = bullet {
@@ -96,7 +116,44 @@ impl Player {
         }
     }
 
-    pub fn render(&self, d: &mut RaylibDrawHandle, camera: &Camera2D, collision_world: &mut CollisionWorld, player_texture: &Texture2D, aimed_at: Vector2) {
+    pub fn handle_shooting(
+        &self,
+        rl: &mut RaylibHandle,
+        collision_world: &mut CollisionWorld,
+        bullets: &mut Vec<WorldColliderHandle>,
+        aimed_at: Vector2,
+    ) {
+        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+            let d = (aimed_at - self.collider.get_pos(collision_world)).normalized();
+            let bullet_speed = 140.0;
+            let bullet_radius = 0.1;
+            bullets.push(collision_world.spawn_collider(
+                RigidBodyArgs {
+                    dynamic: true,
+                    pos: self.collider.get_pos(collision_world) + d * 1.5,
+                    vel: d * bullet_speed + self.collider.get_linvel(&collision_world),
+                    user_data: ColliderUserData::BULLET,
+                },
+                ColliderArgs {
+                    density: 1.5,
+                    restitution: 0.0,
+                    friction: 0.0,
+                },
+                ShapeArgs::Ball {
+                    radius: bullet_radius,
+                },
+            ));
+        }
+    }
+
+    pub fn render(
+        &self,
+        d: &mut RaylibDrawHandle,
+        camera: &Camera2D,
+        collision_world: &mut CollisionWorld,
+        player_texture: &Texture2D,
+        aimed_at: Vector2,
+    ) {
         let player_pos = self.collider.get_pos(collision_world);
         let angle_to_mouse = self
             .collider
@@ -122,6 +179,12 @@ impl Player {
             angle_to_mouse,
             Color::WHITE,
         );
-        d.draw_text(&self.health.to_string(), player_pos.x as i32, player_pos.y as i32, (20.0 * camera.zoom) as i32, Color::WHITE);
+        d.draw_text(
+            &self.health.to_string(),
+            camera.to_screen_x(player_pos.x) as i32,
+            camera.to_screen_y(player_pos.y) as i32,
+            (1.0 * camera.zoom) as i32,
+            Color::WHITE,
+        );
     }
 }

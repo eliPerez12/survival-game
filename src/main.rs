@@ -1,22 +1,26 @@
+use crate::player::*;
+use crate::rapier_world::*;
+use crate::traits::*;
 use collision_world::*;
 use debug::DebugInfo;
 use raylib::prelude::*;
-use crate::rapier_world::*;
-use crate::traits::*;
-use crate::player::*;
+use world::*;
 
 mod collision_world;
 mod debug;
 mod draw_collider;
+mod player;
 mod rapier_world;
 mod traits;
 mod world;
 mod world_collider;
-mod player;
-
 
 fn main() {
-    let (mut rl, thread) = raylib::init().size(1080, 720).title("Physics").vsync().build();
+    let (mut rl, thread) = raylib::init()
+        .size(1080, 720)
+        .title("Physics")
+        .vsync()
+        .build();
     let mut camera = Camera2D {
         offset: Vector2::new(0.0, 0.0),
         zoom: 100.0,
@@ -26,26 +30,10 @@ fn main() {
     let mut debugger = DebugInfo::new();
     let mut player = Player::new(&mut collision_world);
     let mut bullets = Vec::with_capacity(1000);
-
+    let mut debug_colliders = vec![];
     let mut dummies: Vec<Player> = vec![];
 
-    let debug_collider = collision_world.spawn_collider(
-        RigidBodyArgs {
-            dynamic: false,
-            pos: Vector2::zero(),
-            vel: Vector2::zero(),
-            user_data: 0
-        },
-        ColliderArgs {
-            density: 1.0,
-            restitution: 0.5,
-            friction: 0.5,
-        },
-        ShapeArgs::Cuboid {
-            half_extents: Vector2::new(1.0, 10.0),
-        },
-    );
-    
+    spawn_debug_colldier_world(&mut debug_colliders, &mut collision_world);
 
     let player_texture = rl
         .load_texture_from_image(
@@ -58,6 +46,7 @@ fn main() {
         /*
          * Update
          */
+        let mouse_pos = rl.get_mouse_position();
         debugger.update(&mut rl);
         collision_world.step(&rl);
         player.apply_collision_damage(&mut collision_world, &mut bullets);
@@ -66,44 +55,26 @@ fn main() {
             dummy.handle_movement(&rl, &mut collision_world, &mut Vector2::zero());
         }
         player.control_movement(&rl, &mut collision_world);
+        player.handle_shooting(
+            &mut rl,
+            &mut collision_world,
+            &mut bullets,
+            camera.to_world(mouse_pos),
+        );
         camera.handle_camera_controls(&rl);
         camera.track(
             player.collider.get_center_of_mass(&collision_world),
             Vector2::new(rl.get_screen_width() as f32, rl.get_screen_height() as f32),
         );
 
-        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            let d = (camera.to_world(rl.get_mouse_position())
-                - player.collider.get_pos(&collision_world))
-            .normalized();
-            let bullet_speed = 140.0;
-            let bullet_radius = 0.1;
-            bullets.push(collision_world.spawn_collider(
-                RigidBodyArgs {
-                    dynamic: true,
-                    pos: player.collider.get_pos(&collision_world) + d * 1.5,
-                    vel: d * bullet_speed + player.collider.get_linvel(&collision_world),
-                    user_data: ColliderUserData::BULLET,
-                },
-                ColliderArgs {
-                    density: 1.5,
-                    restitution: 0.0,
-                    friction: 0.0,
-                },
-                ShapeArgs::Ball {
-                    radius: bullet_radius,
-                },
-            ));
-        }
-
         if rl.is_key_pressed(KeyboardKey::KEY_G) {
-            dummies.push(
-                {
-                    let dummy = Player::new(&mut collision_world);
-                    dummy.collider.set_pos(camera.to_world(rl.get_mouse_position()), &mut collision_world);
-                    dummy
-                }
-            )
+            dummies.push({
+                let dummy = Player::new(&mut collision_world);
+                dummy
+                    .collider
+                    .set_pos(camera.to_world(mouse_pos), &mut collision_world);
+                dummy
+            })
         }
 
         for bullet in &mut bullets {
@@ -111,7 +82,7 @@ fn main() {
             let bullet_inerta = bullet_speed * bullet.get_mass(&collision_world);
             let drag = 1.1;
             bullet.apply_impulse(
-                -bullet_inerta/drag*rl.get_frame_time(),
+                -bullet_inerta / drag * rl.get_frame_time(),
                 &mut collision_world,
             )
         }
@@ -138,10 +109,7 @@ fn main() {
             "Player Speed: {:?} m/s",
             player.collider.get_vel(&collision_world).length()
         ));
-        debugger.add(format!(
-            "Health: {:?} ",
-            player.health
-        ));
+        debugger.add(format!("Health: {:?} ", player.health));
 
         /*
          * Drawing
@@ -153,8 +121,8 @@ fn main() {
         let camera_world_rect = camera.to_world_rect(&Rectangle::new(
             0.0,
             0.0,
-            d.get_screen_width() as f32,
-            d.get_screen_height() as f32,
+            d.get_screen_width() as f32 * 1.25,
+            d.get_screen_height() as f32 * 1.25,
         ));
         let mut rendering_colliders = 0;
         for bullet in &bullets {
@@ -167,14 +135,63 @@ fn main() {
                 rendering_colliders += 1;
             }
         }
-        debug_collider.draw(&collision_world, camera, &mut d);
-        let player_screen_pos = camera.to_screen(player.collider.get_pos(&collision_world));
-        let mouse_pos = d.get_mouse_position();
-        for dummy in &dummies {
-            dummy.render(&mut d, &camera, &mut collision_world, &player_texture, player_screen_pos)
+        for debug_collider in &debug_colliders {
+            debug_collider.draw(&collision_world, camera, &mut d);
         }
-        player.render(&mut d, &camera, &mut collision_world, &player_texture, mouse_pos);
+        let player_screen_pos = camera.to_screen(player.collider.get_pos(&collision_world));
+
+        for dummy in &dummies {
+            let bounding_sphere = dummy.collider.get_bounding_sphere(&collision_world);
+            let player_bounding_sphere = player.collider.get_bounding_sphere(&collision_world);
+            let player_pos = player.collider.get_pos(&collision_world);
+            let dummy_pos = dummy.collider.get_pos(&collision_world);
+            let dx = dummy_pos - player_pos;
+            let dn = dx.normalized();
+
+            let ray_origin = player_pos + dn * 2.0 * player_bounding_sphere.radius;
+            let ray = &rapier2d::geometry::Ray::new(
+                rapier2d::na::Vector2::new(ray_origin.x, ray_origin.y).into(), 
+                rapier2d::na::Vector2::new(dn.x, dn.y)
+            );
+            let ray_length = dx.length() - (bounding_sphere.radius + player_bounding_sphere.radius);
+
+            let intersection = collision_world.rapier.query_pipeline.cast_ray_and_get_normal(
+                &collision_world.rapier.rigid_body_set,
+                &collision_world.rapier.collider_set,
+                ray,
+                ray_length,
+                true,       
+                rapier2d::pipeline::QueryFilter {exclude_rigid_body: Some(dummy.collider.rigid_body_handle), ..Default::default()}
+            );
+            if camera_world_rect.check_collision_circle_rec(
+                bounding_sphere.center().coords.to_raylib_vector2(),
+                bounding_sphere.radius,
+            ){
+                if let Some(intersection) = intersection {
+                    dbg!(intersection.1.toi);
+                    d.draw_circle_v(camera.to_screen(ray.origin.coords.to_raylib_vector2()), 0.1 * camera.zoom, Color::YELLOW);
+                } else {
+                    dummy.render(
+                        &mut d,
+                        &camera,
+                        &mut collision_world,
+                        &player_texture,
+                        player_screen_pos,
+                    );
+                    rendering_colliders += 1;
+                }
+            }
+        }
+
+        player.render(
+            &mut d,
+            &camera,
+            &mut collision_world,
+            &player_texture,
+            mouse_pos,
+        );
         debugger.add(format!("Drawing colliders: {:?}", rendering_colliders));
+        debugger.add(format!("Mouse_pos: ({:?}, {:?})", camera.to_world(mouse_pos).x as i32, camera.to_world(mouse_pos).y as i32));
 
         // UI
         debugger.draw(&mut d);

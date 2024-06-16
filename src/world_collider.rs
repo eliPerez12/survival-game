@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use ease::quad_in;
 use rapier2d::parry::bounding_volume::BoundingSphere;
 use rapier2d::prelude::*;
 use raylib::prelude::*;
@@ -40,7 +39,8 @@ impl WorldColliderHandle {
     }
 
     pub fn set_pos(&self, pos: Vector2, collision_world: &mut CollisionWorld) {
-        collision_world.rapier.rigid_body_set[self.rigid_body_handle].set_position(nalgebra::Vector2::from_raylib_vector2(pos).into(), true)
+        collision_world.rapier.rigid_body_set[self.rigid_body_handle]
+            .set_position(nalgebra::Vector2::from_raylib_vector2(pos).into(), true)
     }
 
     pub fn get_linvel(&self, collision_world: &CollisionWorld) -> Vector2 {
@@ -118,6 +118,6 @@ impl WorldColliderHandle {
         d: &mut RaylibDrawHandle,
     ) {
         let isometry_shape = self.get_isometry_shape(collision_world);
-        draw_shape(isometry_shape, Color::WHITE, d, &camera);
+        draw_shape(isometry_shape, Color::RED, d, &camera);
     }
 }
