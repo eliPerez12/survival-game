@@ -1,9 +1,44 @@
 use crate::collision_world::*;
 use crate::world_collider::*;
+use crate::Assets;
 use crate::GameWorld;
 use crate::ImprovedCamera;
 use crate::RaylibVector2;
 use raylib::prelude::*;
+
+struct Corpse {
+    pos: Vector2,
+    animation_stage: i32,
+    time_elapsed: f32,
+    angle: f32,
+}
+
+impl Corpse {
+    pub fn update_animation() {
+
+    }
+
+    pub fn render(&self, d: &mut RaylibDrawHandle, corpse_texture: &Texture2D, camera: &Camera2D) {
+        d.draw_texture_pro(
+            corpse_texture,
+            Rectangle::new(
+                0.0,
+                0.0,
+                corpse_texture.width() as f32,
+                corpse_texture.height() as f32
+            ),
+            camera.to_screen_rect(&Rectangle::new(
+                self.pos.x,
+                self.pos.y,
+                corpse_texture.width() as f32 / 10.0,
+                corpse_texture.width() as f32 / 10.0,
+            )),
+            Vector2::new(3.2 * camera.zoom, 3.2 * camera.zoom),
+            self.angle,
+            Color::WHITE,
+        );
+    }
+}
 
 pub struct Player {
     pub collider: WorldColliderHandle,
@@ -139,7 +174,7 @@ impl Player {
                     density: 1.5,
                     restitution: 0.01,
                     friction: 0.7,
-                    user_data: ColliderUserData::BULLET
+                    user_data: ColliderUserData::BULLET,
                 },
                 ShapeArgs::Ball {
                     radius: bullet_radius,
@@ -148,7 +183,13 @@ impl Player {
         }
     }
 
-    pub fn handle_spawning_dunmmies(&self, rl: &RaylibHandle, camera: &Camera2D, collision_world: &mut CollisionWorld, game_world: &mut GameWorld) {
+    pub fn handle_spawning_dunmmies(
+        &self,
+        rl: &RaylibHandle,
+        camera: &Camera2D,
+        collision_world: &mut CollisionWorld,
+        game_world: &mut GameWorld,
+    ) {
         let mouse_pos = rl.get_mouse_position();
         if rl.is_key_pressed(KeyboardKey::KEY_G) {
             game_world.dummies.push({
@@ -166,9 +207,10 @@ impl Player {
         d: &mut RaylibDrawHandle,
         camera: &Camera2D,
         collision_world: &mut CollisionWorld,
-        player_texture: &Texture2D,
+        assets: &Assets,
         aimed_at: Vector2,
     ) {
+        let player_texture = assets.get_texture("rifle.png");
         let player_pos = self.collider.get_pos(collision_world);
         let angle_to_mouse = self
             .collider
@@ -176,6 +218,8 @@ impl Player {
             .angle_to(camera.to_world(aimed_at))
             .to_degrees()
             - 90.0;
+        
+        let scale = 0.1;
         d.draw_texture_pro(
             player_texture,
             Rectangle::new(
@@ -187,17 +231,21 @@ impl Player {
             camera.to_screen_rect(&Rectangle::new(
                 player_pos.x,
                 player_pos.y,
-                player_texture.width() as f32 / 10.0,
-                player_texture.width() as f32 / 10.0,
+                player_texture.width() as f32  * scale,
+                player_texture.width() as f32  * scale,
             )),
-            Vector2::new(3.2 * camera.zoom, 3.2 * camera.zoom),
+            Vector2::new(
+                player_texture.width() as f32 * scale / 2.0 * camera.zoom,
+                player_texture.height() as f32 * scale / 2.0 * camera.zoom,
+            ),
             angle_to_mouse,
             Color::WHITE,
         );
+        let font_size = 1.0;
         d.draw_text(
             &self.health.to_string(),
-            camera.to_screen_x(player_pos.x) as i32,
-            camera.to_screen_y(player_pos.y) as i32,
+            camera.to_screen_x(player_pos.x - font_size / 2.0) as i32,
+            camera.to_screen_y(player_pos.y - font_size / 2.0) as i32,
             (1.0 * camera.zoom) as i32,
             Color::WHITE,
         );

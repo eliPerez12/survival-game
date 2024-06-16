@@ -1,7 +1,6 @@
-use crate::{collision_world::*, world_collider::WorldColliderHandle, Player, traits::*};
+use crate::{collision_world::*, traits::*, world_collider::WorldColliderHandle, Assets, Player};
 use rand::Rng;
 use raylib::prelude::*;
-
 
 pub struct GameWorld {
     pub bullets: Vec<WorldColliderHandle>,
@@ -16,22 +15,27 @@ impl GameWorld {
         }
     }
 
-    pub fn apply_damage_dummies(&mut self, rl: &mut RaylibHandle, collision_world: &mut CollisionWorld) {
+    pub fn apply_damage_dummies(
+        &mut self,
+        rl: &mut RaylibHandle,
+        collision_world: &mut CollisionWorld,
+    ) {
         for dummy in &mut self.dummies {
             dummy.apply_collision_damage(collision_world, &mut self.bullets);
             dummy.handle_movement(rl, collision_world, &mut Vector2::zero());
         }
     }
 
-    pub fn handle_bullet_physics(&mut self, rl: &RaylibHandle, collision_world: &mut CollisionWorld) {
+    pub fn handle_bullet_physics(
+        &mut self,
+        rl: &RaylibHandle,
+        collision_world: &mut CollisionWorld,
+    ) {
         for bullet in &mut self.bullets {
             let bullet_speed = bullet.get_vel(collision_world);
             let bullet_inerta = bullet_speed * bullet.get_mass(collision_world);
             let drag = 1.1;
-            bullet.apply_impulse(
-                -bullet_inerta / drag * rl.get_frame_time(),
-                collision_world,
-            )
+            bullet.apply_impulse(-bullet_inerta / drag * rl.get_frame_time(), collision_world)
         }
 
         self.bullets.retain(|bullet_handle| {
@@ -44,7 +48,12 @@ impl GameWorld {
         });
     }
 
-    pub fn render_bullets(&mut self, d: &mut RaylibDrawHandle, camera: &Camera2D, collision_world: &mut CollisionWorld) {
+    pub fn render_bullets(
+        &mut self,
+        d: &mut RaylibDrawHandle,
+        camera: &Camera2D,
+        collision_world: &mut CollisionWorld,
+    ) {
         let camera_world_rect = camera.to_world_rect(&Rectangle::new(
             0.0,
             0.0,
@@ -62,7 +71,14 @@ impl GameWorld {
         }
     }
 
-    pub fn render_dummies(&self, player: &Player, camera: &Camera2D, collision_world: &mut CollisionWorld, d: &mut RaylibDrawHandle, player_texture: &Texture2D) {
+    pub fn render_dummies(
+        &self,
+        player: &Player,
+        camera: &Camera2D,
+        collision_world: &mut CollisionWorld,
+        d: &mut RaylibDrawHandle,
+        assets: &Assets,
+    ) {
         let player_screen_pos = camera.to_screen(player.collider.get_pos(collision_world));
         let camera_world_rect = camera.to_world_rect(&Rectangle::new(
             0.0,
@@ -80,37 +96,47 @@ impl GameWorld {
 
             let ray_origin = player_pos + dn * 2.0 * player_bounding_sphere.radius;
             let ray = &rapier2d::geometry::Ray::new(
-                rapier2d::na::Vector2::new(ray_origin.x, ray_origin.y).into(), 
-                rapier2d::na::Vector2::new(dn.x, dn.y)
+                rapier2d::na::Vector2::new(ray_origin.x, ray_origin.y).into(),
+                rapier2d::na::Vector2::new(dn.x, dn.y),
             );
             let ray_length = dx.length() - (bounding_sphere.radius + player_bounding_sphere.radius);
-            fn predicate(_handle: rapier2d::geometry::ColliderHandle, collider: &rapier2d::geometry::Collider) -> bool {
+            fn predicate(
+                _handle: rapier2d::geometry::ColliderHandle,
+                collider: &rapier2d::geometry::Collider,
+            ) -> bool {
                 collider.shape().as_cuboid().is_some()
             }
-            let intersection = collision_world.rapier.query_pipeline.cast_ray_and_get_normal(
-                &collision_world.rapier.rigid_body_set,
-                &collision_world.rapier.collider_set,
-                ray,
-                ray_length,
-                true,       
-                rapier2d::pipeline::QueryFilter {
-                    exclude_rigid_body: Some(dummy.collider.rigid_body_handle),
-                    predicate: Some(&predicate),
-                    ..Default::default()
-                }
-            );
+            let intersection = collision_world
+                .rapier
+                .query_pipeline
+                .cast_ray_and_get_normal(
+                    &collision_world.rapier.rigid_body_set,
+                    &collision_world.rapier.collider_set,
+                    ray,
+                    ray_length,
+                    true,
+                    rapier2d::pipeline::QueryFilter {
+                        exclude_rigid_body: Some(dummy.collider.rigid_body_handle),
+                        predicate: Some(&predicate),
+                        ..Default::default()
+                    },
+                );
             if camera_world_rect.check_collision_circle_rec(
                 bounding_sphere.center().coords.to_raylib_vector2(),
                 bounding_sphere.radius,
-            ){
+            ) {
                 if let Some(_intersection) = intersection {
-                    d.draw_circle_v(camera.to_screen(ray.origin.coords.to_raylib_vector2()), 0.1 * camera.zoom, Color::YELLOW);
+                    d.draw_circle_v(
+                        camera.to_screen(ray.origin.coords.to_raylib_vector2()),
+                        0.1 * camera.zoom,
+                        Color::YELLOW,
+                    );
                 } else {
                     dummy.render(
                         d,
                         camera,
                         collision_world,
-                        player_texture,
+                        assets,
                         player_screen_pos,
                     );
                 }
@@ -118,8 +144,6 @@ impl GameWorld {
         }
     }
 }
-
-
 
 pub fn spawn_debug_colldier_world(
     debug_colliders: &mut Vec<WorldColliderHandle>,

@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::fmt::format;
+
 use crate::player::*;
 use crate::rapier_world::*;
 use crate::traits::*;
@@ -15,6 +18,41 @@ mod traits;
 mod world;
 mod world_collider;
 
+pub struct Assets {
+    textures: HashMap<String, Texture2D>,
+    error_texture: Texture2D,
+}
+
+impl Assets {
+    pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
+        Assets {
+            textures: Self::load_assets_in_dir(rl, thread, "assets".to_string()),
+            error_texture: rl.load_texture_from_image(&thread, &Image::load_image_from_mem(".png", include_bytes!("../assets/error.png")).unwrap()).unwrap()
+        }
+    }
+
+    fn load_assets_in_dir(rl: &mut RaylibHandle, thread: &RaylibThread, path: String) -> HashMap<String, Texture2D>{
+        let mut assets = HashMap::new();
+        let dir = std::fs::read_dir(path.clone()).unwrap();
+        for entry in dir {
+            let entry = entry.unwrap();
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            let mut full_path = format!("{}/{}", path, file_name);
+            if entry.file_type().unwrap().is_dir() {
+                assets.extend(Self::load_assets_in_dir(rl, thread, full_path));
+            } else {
+                let texture_name = full_path.split_off(7);                                                         
+                assets.insert(texture_name, rl.load_texture(thread, &format!("{}/{}", path, file_name)).unwrap());
+            }
+        }
+        assets
+    }
+
+    pub fn get_texture(&self, texture_name: &str) -> &Texture2D {
+        self.textures.get(texture_name).or(Some(&self.error_texture)).unwrap()
+    }
+}
+
 fn main() {
     let (mut rl, thread) = raylib::init()
         .size(1080, 720)
@@ -30,16 +68,10 @@ fn main() {
     let mut game_world = GameWorld::new();
     let mut debugger = DebugInfo::new();
     let mut player = Player::new(&mut collision_world);
+    let assets = Assets::new(&mut rl, &thread);
     let mut debug_colliders = vec![];
 
     spawn_debug_colldier_world(&mut debug_colliders, &mut collision_world);
-
-    let player_texture = rl
-        .load_texture_from_image(
-            &thread,
-            &Image::load_image_from_mem(".png", include_bytes!("..//assets//rifle.png")).unwrap(),
-        )
-        .unwrap();
 
     while !rl.window_should_close() {
         /*
@@ -83,15 +115,25 @@ fn main() {
         for debug_collider in &debug_colliders {
             debug_collider.draw(&collision_world, &camera, &mut d);
         }
-        game_world.render_dummies(&player, &camera, &mut collision_world, &mut d, &player_texture);
+        game_world.render_dummies(
+            &player,
+            &camera,
+            &mut collision_world,
+            &mut d,
+            &assets,
+        );
         player.render(
             &mut d,
             &camera,
             &mut collision_world,
-            &player_texture,
+            &assets,
             mouse_pos,
         );
-        debugger.add(format!("Mouse_pos: ({:?}, {:?})", camera.to_world(mouse_pos).x as i32, camera.to_world(mouse_pos).y as i32));
+        debugger.add(format!(
+            "Mouse_pos: ({:?}, {:?})",
+            camera.to_world(mouse_pos).x as i32,
+            camera.to_world(mouse_pos).y as i32
+        ));
 
         // UI
         debugger.draw(&mut d);

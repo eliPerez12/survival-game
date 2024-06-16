@@ -32,7 +32,7 @@ impl Default for RigidBodyArgs {
             dynamic: true,
             pos: Vector2::zero(),
             vel: Vector2::zero(),
-            user_data: 0
+            user_data: 0,
         }
     }
 }
