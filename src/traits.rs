@@ -6,6 +6,7 @@ pub trait ImprovedCamera {
     fn to_screen_x(&self, world_pos_x: f32) -> f32;
     fn to_screen_y(&self, world_pos_y: f32) -> f32;
     fn to_screen_rect(&self, rect: &Rectangle) -> Rectangle;
+    fn to_world_rect(&self, rect: &Rectangle) -> Rectangle;
     fn to_world(&self, screen_pos: Vector2) -> Vector2;
     fn track(&mut self, pos: Vector2, screen_size: Vector2);
     fn get_world_pos(&self, offset: Vector2, screen_size: Vector2) -> Vector2;
@@ -36,6 +37,15 @@ impl ImprovedCamera for Camera2D {
         }
     }
 
+    fn to_world_rect(&self, rect: &Rectangle) -> Rectangle {
+        Rectangle {
+            x: rect.x / self.zoom - self.offset.x,
+            y: rect.y / self.zoom - self.offset.y,
+            width: rect.width / self.zoom,
+            height: rect.height / self.zoom,
+        }
+    }
+
     fn to_world(&self, screen_pos: Vector2) -> Vector2 {
         (screen_pos / self.zoom) - self.offset
     }
@@ -53,20 +63,6 @@ impl ImprovedCamera for Camera2D {
     }
 
     fn handle_camera_controls(&mut self, rl: &RaylibHandle) {
-        let camera_speed = 300.0 * rl.get_frame_time() / self.zoom;
-        if rl.is_key_down(KeyboardKey::KEY_W) {
-            self.offset.y += camera_speed;
-        }
-        if rl.is_key_down(KeyboardKey::KEY_S) {
-            self.offset.y -= camera_speed;
-        }
-        if rl.is_key_down(KeyboardKey::KEY_A) {
-            self.offset.x += camera_speed;
-        }
-        if rl.is_key_down(KeyboardKey::KEY_D) {
-            self.offset.x -= camera_speed;
-        }
-
         let screen_size = Vector2::new(rl.get_screen_width() as f32, rl.get_screen_height() as f32);
         let mouse_wheel_move = rl.get_mouse_wheel_move();
 

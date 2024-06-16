@@ -1,14 +1,13 @@
 use crate::world_collider::WorldColliderHandle;
-use rapier2d::parry::shape;
 use rapier2d::prelude::*;
 use raylib::prelude::*;
 
 use crate::rapier_world::*;
 use crate::traits::*;
+
 #[derive(Default)]
 pub struct CollisionWorld {
     pub rapier: RapierCollisionWorld, //TODO: Make private
-    pub colliders: Vec<WorldColliderHandle>,
 }
 
 pub struct RigidBodyArgs {
@@ -121,22 +120,21 @@ impl CollisionWorld {
             rigid_body_handle,
             &mut self.rapier.rigid_body_set,
         );
-        let world_collider_handle = match shape_args {
-            ShapeArgs::Cuboid { .. } => WorldColliderHandle::Cuboid {
-                rigid_body_handle,
-                collider_handle,
-            },
-            ShapeArgs::Ball { .. } => WorldColliderHandle::Ball {
-                rigid_body_handle,
-                collider_handle,
-            },
-            ShapeArgs::Triangle { .. } => WorldColliderHandle::Triangle {
-                rigid_body_handle,
-                collider_handle,
-            },
-        };
-        self.colliders.push(world_collider_handle.clone());
-        world_collider_handle
+        WorldColliderHandle {
+            rigid_body_handle,
+            collider_handle,
+        }
+    }
+
+    pub fn delete_collider(&mut self, collider: WorldColliderHandle) {
+        self.rapier.rigid_body_set.remove(
+            collider.rigid_body_handle,
+            &mut self.rapier.island_manager,
+            &mut self.rapier.collider_set,
+            &mut self.rapier.impulse_joint_set,
+            &mut self.rapier.multibody_joint_set,
+            true,
+        );
     }
 
     pub fn spawn_compound(
@@ -153,20 +151,29 @@ impl CollisionWorld {
             rigid_body_handle,
             &mut self.rapier.rigid_body_set,
         );
-        let world_collider_handle = WorldColliderHandle::Compound {
+        WorldColliderHandle {
             rigid_body_handle,
             collider_handle,
-        };
-        self.colliders.push(world_collider_handle.clone());
-        world_collider_handle
+        }
     }
 }
 
 impl CollisionWorld {
-    const MIN_PHYSICS_ACCURACY: f32 = 1.0 / 90.0;
+    const FIXED_TIME_STEP: f32 = 1.0 / 100.0;
+    const MAX_FRAME_TIME: f32 = 0.25; // To prevent spiral of death in case of a long frame
 
     pub fn step(&mut self, rl: &RaylibHandle) {
-        self.rapier.integration_parameters.dt = rl.get_frame_time().min(Self::MIN_PHYSICS_ACCURACY);
-        self.rapier.step();
+        // Get the elapsed time for the current frame
+        let frame_time = rl.get_frame_time().min(Self::MAX_FRAME_TIME);
+
+        // Accumulate the elapsed time
+        self.rapier.accumulated_time += frame_time;
+
+        // Perform physics updates in fixed time steps
+        while self.rapier.accumulated_time >= Self::FIXED_TIME_STEP {
+            self.rapier.integration_parameters.dt = Self::FIXED_TIME_STEP;
+            self.rapier.step();
+            self.rapier.accumulated_time -= Self::FIXED_TIME_STEP;
+        }
     }
 }

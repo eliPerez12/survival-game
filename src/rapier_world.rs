@@ -12,18 +12,19 @@ pub struct RapierCollisionWorld {
     physics_pipeline: PhysicsPipeline,
     gravity: Vector<Real>,
     pub integration_parameters: IntegrationParameters,
-    island_manager: IslandManager,
+    pub island_manager: IslandManager,
     broad_phase: BroadPhase,
-    narrow_phase: NarrowPhase,
+    pub narrow_phase: NarrowPhase,
     pub rigid_body_set: RigidBodySet,
     pub collider_set: ColliderSet,
-    impulse_joint_set: ImpulseJointSet,
-    multibody_joint_set: MultibodyJointSet,
+    pub impulse_joint_set: ImpulseJointSet,
+    pub multibody_joint_set: MultibodyJointSet,
     ccd_solver: CCDSolver,
     query_pipeline: QueryPipeline,
     event_handler: ChannelEventCollector,
     collision_recv: Receiver<CollisionEvent>,
     contact_force_recv: Receiver<ContactForceEvent>,
+    pub accumulated_time: f32,
 }
 
 impl Default for RapierCollisionWorld {
@@ -47,6 +48,7 @@ impl Default for RapierCollisionWorld {
             event_handler: { ChannelEventCollector::new(collision_send, contact_force_send) },
             collision_recv,
             contact_force_recv,
+            accumulated_time: 0.0,
         }
     }
 }
