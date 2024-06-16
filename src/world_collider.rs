@@ -114,10 +114,10 @@ impl WorldColliderHandle {
     pub fn draw(
         &self,
         collision_world: &CollisionWorld,
-        camera: Camera2D,
+        camera: &Camera2D,
         d: &mut RaylibDrawHandle,
     ) {
         let isometry_shape = self.get_isometry_shape(collision_world);
-        draw_shape(isometry_shape, Color::RED, d, &camera);
+        draw_shape(isometry_shape, Color::RED, d, camera);
     }
 }

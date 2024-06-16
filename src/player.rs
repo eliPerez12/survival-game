@@ -1,5 +1,6 @@
 use crate::collision_world::*;
 use crate::world_collider::*;
+use crate::GameWorld;
 use crate::ImprovedCamera;
 use crate::RaylibVector2;
 use raylib::prelude::*;
@@ -53,7 +54,7 @@ impl Player {
         let player_acceleration = player_speed * rl.get_frame_time();
         let player_max_speed = match rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) {
             false => 3.0,
-            true => 6.0,
+            true => 6.6,
         };
         let player_drag = player_speed / player_max_speed * rl.get_frame_time();
         let drag_vector = -self.collider.get_linvel(collision_world);
@@ -91,7 +92,7 @@ impl Player {
             let other_rigid_body_handle = other_collider.parent().unwrap();
             let other_rigid_body = &collision_world.rapier.rigid_body_set[other_rigid_body_handle];
             let other_collider_speed = other_rigid_body.linvel().to_raylib_vector2().length();
-            let player_deflection_level = 50.0;
+            let player_deflection_level = 40.0;
             if other_rigid_body.user_data == ColliderUserData::BULLET
                 && dbg!(other_collider_speed) > player_deflection_level
             {
@@ -125,7 +126,7 @@ impl Player {
     ) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             let d = (aimed_at - self.collider.get_pos(collision_world)).normalized();
-            let bullet_speed = 140.0;
+            let bullet_speed = 110.0;
             let bullet_radius = 0.1;
             bullets.push(collision_world.spawn_collider(
                 RigidBodyArgs {
@@ -136,14 +137,27 @@ impl Player {
                 },
                 ColliderArgs {
                     density: 1.5,
-                    restitution: 0.0,
-                    friction: 0.0,
+                    restitution: 0.01,
+                    friction: 0.7,
                     user_data: ColliderUserData::BULLET
                 },
                 ShapeArgs::Ball {
                     radius: bullet_radius,
                 },
             ));
+        }
+    }
+
+    pub fn handle_spawning_dunmmies(&self, rl: &RaylibHandle, camera: &Camera2D, collision_world: &mut CollisionWorld, game_world: &mut GameWorld) {
+        let mouse_pos = rl.get_mouse_position();
+        if rl.is_key_pressed(KeyboardKey::KEY_G) {
+            game_world.dummies.push({
+                let dummy = Player::new(collision_world);
+                dummy
+                    .collider
+                    .set_pos(camera.to_world(mouse_pos), collision_world);
+                dummy
+            })
         }
     }
 
