@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::world_collider::WorldColliderHandle;
 use rapier2d::prelude::*;
 use raylib::prelude::*;
@@ -14,6 +16,7 @@ pub struct ColliderUserData;
 
 impl ColliderUserData {
     pub const BULLET: u128 = 2;
+    pub const WALL: u128 = 0;
 }
 
 pub struct RigidBodyArgs {
@@ -21,6 +24,17 @@ pub struct RigidBodyArgs {
     pub pos: Vector2,
     pub vel: Vector2,
     pub user_data: u128,
+}
+
+impl Default for RigidBodyArgs {
+    fn default() -> Self {
+        RigidBodyArgs {
+            dynamic: true,
+            pos: Vector2::zero(),
+            vel: Vector2::zero(),
+            user_data: 0
+        }
+    }
 }
 
 impl RigidBodyArgs {
@@ -48,6 +62,7 @@ pub struct ColliderArgs {
     pub density: f32,
     pub restitution: f32,
     pub friction: f32,
+    pub user_data: u128,
 }
 
 impl ColliderArgs {
@@ -109,6 +124,7 @@ impl Default for ColliderArgs {
             density: 1.0,
             restitution: 0.7,
             friction: 0.5,
+            user_data: 0,
         }
     }
 }

@@ -27,11 +27,10 @@ fn main() {
         ..Default::default()
     };
     let mut collision_world = CollisionWorld::default();
+    let mut game_world = GameWorld::new();
     let mut debugger = DebugInfo::new();
     let mut player = Player::new(&mut collision_world);
-    let mut bullets = Vec::with_capacity(1000);
     let mut debug_colliders = vec![];
-    let mut dummies: Vec<Player> = vec![];
 
     spawn_debug_colldier_world(&mut debug_colliders, &mut collision_world);
 
@@ -49,16 +48,13 @@ fn main() {
         let mouse_pos = rl.get_mouse_position();
         debugger.update(&mut rl);
         collision_world.step(&rl);
-        player.apply_collision_damage(&mut collision_world, &mut bullets);
-        for dummy in &mut dummies {
-            dummy.apply_collision_damage(&mut collision_world, &mut bullets);
-            dummy.handle_movement(&rl, &mut collision_world, &mut Vector2::zero());
-        }
+        player.apply_collision_damage(&mut collision_world, &mut game_world.bullets);
+        game_world.apply_damage_dummies(&mut rl, &mut collision_world);
         player.control_movement(&rl, &mut collision_world);
         player.handle_shooting(
             &mut rl,
             &mut collision_world,
-            &mut bullets,
+            &mut game_world.bullets,
             camera.to_world(mouse_pos),
         );
         camera.handle_camera_controls(&rl);
@@ -68,7 +64,7 @@ fn main() {
         );
 
         if rl.is_key_pressed(KeyboardKey::KEY_G) {
-            dummies.push({
+            game_world.dummies.push({
                 let dummy = Player::new(&mut collision_world);
                 dummy
                     .collider
@@ -77,7 +73,7 @@ fn main() {
             })
         }
 
-        for bullet in &mut bullets {
+        for bullet in &mut game_world.bullets {
             let bullet_speed = bullet.get_vel(&collision_world);
             let bullet_inerta = bullet_speed * bullet.get_mass(&collision_world);
             let drag = 1.1;
@@ -87,7 +83,7 @@ fn main() {
             )
         }
 
-        bullets.retain(|bullet_handle| {
+        game_world.bullets.retain(|bullet_handle| {
             if bullet_handle.get_vel(&collision_world).length() < 5.0 {
                 collision_world.delete_collider(bullet_handle.clone());
                 false
@@ -125,7 +121,7 @@ fn main() {
             d.get_screen_height() as f32 * 1.25,
         ));
         let mut rendering_colliders = 0;
-        for bullet in &bullets {
+        for bullet in &game_world.bullets {
             let bounding_sphere = bullet.get_bounding_sphere(&collision_world);
             if camera_world_rect.check_collision_circle_rec(
                 bounding_sphere.center().coords.to_raylib_vector2(),
@@ -140,7 +136,7 @@ fn main() {
         }
         let player_screen_pos = camera.to_screen(player.collider.get_pos(&collision_world));
 
-        for dummy in &dummies {
+        for dummy in &game_world.dummies {
             let bounding_sphere = dummy.collider.get_bounding_sphere(&collision_world);
             let player_bounding_sphere = player.collider.get_bounding_sphere(&collision_world);
             let player_pos = player.collider.get_pos(&collision_world);
@@ -154,21 +150,26 @@ fn main() {
                 rapier2d::na::Vector2::new(dn.x, dn.y)
             );
             let ray_length = dx.length() - (bounding_sphere.radius + player_bounding_sphere.radius);
-
+            fn predicate(_handle: rapier2d::geometry::ColliderHandle, collider: &rapier2d::geometry::Collider) -> bool {
+                collider.shape().as_cuboid().is_some()
+            }
             let intersection = collision_world.rapier.query_pipeline.cast_ray_and_get_normal(
                 &collision_world.rapier.rigid_body_set,
                 &collision_world.rapier.collider_set,
                 ray,
                 ray_length,
                 true,       
-                rapier2d::pipeline::QueryFilter {exclude_rigid_body: Some(dummy.collider.rigid_body_handle), ..Default::default()}
+                rapier2d::pipeline::QueryFilter {
+                    exclude_rigid_body: Some(dummy.collider.rigid_body_handle),
+                    predicate: Some(&predicate),
+                    ..Default::default()
+                }
             );
             if camera_world_rect.check_collision_circle_rec(
                 bounding_sphere.center().coords.to_raylib_vector2(),
                 bounding_sphere.radius,
             ){
-                if let Some(intersection) = intersection {
-                    dbg!(intersection.1.toi);
+                if let Some(_intersection) = intersection {
                     d.draw_circle_v(camera.to_screen(ray.origin.coords.to_raylib_vector2()), 0.1 * camera.zoom, Color::YELLOW);
                 } else {
                     dummy.render(

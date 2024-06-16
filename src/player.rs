@@ -131,13 +131,14 @@ impl Player {
                 RigidBodyArgs {
                     dynamic: true,
                     pos: self.collider.get_pos(collision_world) + d * 1.5,
-                    vel: d * bullet_speed + self.collider.get_linvel(&collision_world),
+                    vel: d * bullet_speed + self.collider.get_linvel(collision_world),
                     user_data: ColliderUserData::BULLET,
                 },
                 ColliderArgs {
                     density: 1.5,
                     restitution: 0.0,
                     friction: 0.0,
+                    user_data: ColliderUserData::BULLET
                 },
                 ShapeArgs::Ball {
                     radius: bullet_radius,
