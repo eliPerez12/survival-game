@@ -28,7 +28,8 @@ impl Corpse {
 
     }
 
-    pub fn render(&self, d: &mut RaylibDrawHandle, assets: &Assets, camera: &Camera2D) {
+    pub fn render(&self, d: &mut RaylibDrawHandle, assets: &Assets, camera: &Camera2D, thread: &RaylibThread, target: &mut RenderTexture2D) {
+        let mut d = d.begin_texture_mode(thread, target);
         let corpse_texture = assets.get_texture(&format!("corpses/corpse{}.png", self.animation_stage));
         let scale = 0.1;
         //d.draw_circle_v(camera.to_screen(self.pos), 1.0 * camera.zoom, Color::WHITE);
@@ -122,8 +123,8 @@ impl Player {
         let player_speed = 25.0 * self.collider.get_mass(collision_world);
         let player_acceleration = player_speed * rl.get_frame_time();
         let player_max_speed = match rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) {
-            false => 3.0,
-            true => 6.6,
+            false => 3.6,
+            true => 7.6,
         };
         let player_drag = player_speed / player_max_speed * rl.get_frame_time();
         let drag_vector = -self.collider.get_linvel(collision_world);
@@ -242,10 +243,12 @@ impl Player {
         camera: &Camera2D,
         collision_world: &mut CollisionWorld,
         assets: &Assets,
+        thread: &RaylibThread,
+        target: &mut RenderTexture2D,
     ) {
         let player_texture = assets.get_texture("rifle.png");
         let player_pos = self.collider.get_pos(collision_world);
-        
+        let mut d = d.begin_texture_mode(thread, target);
         let scale = 0.1;
         d.draw_texture_pro(
             player_texture,

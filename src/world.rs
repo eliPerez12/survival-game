@@ -68,8 +68,10 @@ impl GameWorld {
     pub fn render_bullets(
         &mut self,
         d: &mut RaylibDrawHandle,
+        thread: &RaylibThread,
         camera: &Camera2D,
         collision_world: &mut CollisionWorld,
+        target: &mut RenderTexture2D,
     ) {
         let camera_world_rect = camera.to_world_rect(&Rectangle::new(
             0.0,
@@ -83,7 +85,7 @@ impl GameWorld {
                 bounding_sphere.center().coords.to_raylib_vector2(),
                 bounding_sphere.radius,
             ) {
-                bullet.draw(collision_world, camera, d);
+                bullet.draw(collision_world, camera, d, thread, target);
             }
         }
     }
@@ -93,6 +95,8 @@ impl GameWorld {
         camera: &Camera2D,
         d: &mut RaylibDrawHandle,
         assets: &Assets,
+        thread: &RaylibThread,
+        target: &mut RenderTexture2D
     ) {
         let camera_world_rect = camera.to_world_rect(&Rectangle::new(
             0.0,
@@ -102,7 +106,7 @@ impl GameWorld {
         ));
         for corpse in &self.corpses {
             if camera_world_rect.check_collision_point_rec(corpse.pos) {
-                corpse.render(d, assets, camera)
+                corpse.render(d, assets, camera, thread, target)
             }
         }
     }
@@ -114,6 +118,8 @@ impl GameWorld {
         collision_world: &mut CollisionWorld,
         d: &mut RaylibDrawHandle,
         assets: &Assets,
+        thread: &RaylibThread,
+        target: &mut RenderTexture2D,
     ) {
         let camera_world_rect = camera.to_world_rect(&Rectangle::new(
             0.0,
@@ -161,13 +167,15 @@ impl GameWorld {
                 bounding_sphere.radius,
             ) {
                 if let Some(_intersection) = intersection {
+                    let mut d = d.begin_texture_mode(thread, target);
                     d.draw_circle_v(
                         camera.to_screen(ray.origin.coords.to_raylib_vector2()),
                         0.1 * camera.zoom,
                         Color::YELLOW,
                     );
                 } else {
-                    dummy.render(d, camera, collision_world, assets);
+
+                    dummy.render(d, camera, collision_world, assets, thread, target);
                 }
             }
         }

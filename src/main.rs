@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-
 use crate::player::*;
 use crate::rapier_world::*;
 use crate::traits::*;
+use assets::Assets;
 use collision_world::*;
 use debug::DebugInfo;
+use lighting::LightEngine;
 use raylib::prelude::*;
 use world::*;
 
@@ -16,57 +16,64 @@ mod rapier_world;
 mod traits;
 mod world;
 mod world_collider;
+mod lighting;
+mod assets;
 
-pub struct Assets {
-    textures: HashMap<String, Texture2D>,
-    error_texture: Texture2D,
+pub struct LightingRenderer {
+    pub shader: Shader,
+    target: RenderTexture2D,
+    shadow_target: RenderTexture2D,
 }
 
-impl Assets {
+impl LightingRenderer {
     pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
-        Assets {
-            textures: Self::load_assets_in_dir(rl, thread, "assets".to_string()),
-            error_texture: rl
-                .load_texture_from_image(
+        LightingRenderer {
+            shader: rl.load_shader_from_memory(
+                thread,
+                None,
+                Some(include_str!("../shaders/lighting.fs")),
+            ),
+            target: rl
+                .load_render_texture(
                     thread,
-                    &Image::load_image_from_mem(".png", include_bytes!("../assets/error.png"))
-                        .unwrap(),
+                    rl.get_screen_width() as u32,
+                    rl.get_screen_height() as u32,
+                )
+                .unwrap(),
+            shadow_target: rl
+                .load_render_texture(
+                    thread,
+                    rl.get_screen_width() as u32,
+                    rl.get_screen_height() as u32,
                 )
                 .unwrap(),
         }
     }
 
-    fn load_assets_in_dir(
+    // Updates internal renderer target to resize with the window
+    pub fn update_target(
+        &mut self,
         rl: &mut RaylibHandle,
         thread: &RaylibThread,
-        path: String,
-    ) -> HashMap<String, Texture2D> {
-        let mut assets = HashMap::new();
-        let dir = std::fs::read_dir(path.clone()).unwrap();
-        for entry in dir {
-            let entry = entry.unwrap();
-            let file_name = entry.file_name().to_string_lossy().to_string();
-            let mut full_path = format!("{}/{}", path, file_name);
-            if entry.file_type().unwrap().is_dir() {
-                assets.extend(Self::load_assets_in_dir(rl, thread, full_path));
-            } else {
-                let texture_name = full_path.split_off(7);
-                assets.insert(
-                    texture_name,
-                    rl.load_texture(thread, &format!("{}/{}", path, file_name))
-                        .unwrap(),
-                );
-            }
+    ) {
+        let screen_size = Vector2::new(rl.get_screen_width() as f32, rl.get_screen_height() as f32);
+        if rl.is_window_resized() {
+            self.target = rl
+                .load_render_texture(thread, screen_size.x as u32, screen_size.y as u32)
+                .unwrap();
+            self.shadow_target = rl
+                .load_render_texture(thread, screen_size.x as u32, screen_size.y as u32)
+                .unwrap();
         }
-        assets
     }
 
-    pub fn get_texture(&self, texture_name: &str) -> &Texture2D {
-        self.textures
-            .get(texture_name)
-            .unwrap_or(&self.error_texture)
+    // Clears the internal target with black background
+    fn clear_target(&mut self, d: &mut RaylibDrawHandle, thread: &RaylibThread) {
+        d.begin_texture_mode(thread, &mut self.target)
+            .clear_background(Color::BLACK);
     }
 }
+
 
 fn main() {
     let (mut rl, thread) = raylib::init()
@@ -80,11 +87,14 @@ fn main() {
         ..Default::default()
     };
     let mut collision_world = CollisionWorld::default();
+    let mut lighting_renderer = LightingRenderer::new(&mut rl, &thread);
+    let mut light_engine = LightEngine::new(&mut lighting_renderer.shader);
     let mut game_world = GameWorld::new();
     let mut debugger = DebugInfo::new();
     let mut player = Player::new(&mut collision_world);
     let assets = Assets::new(&mut rl, &thread);
     let mut debug_colliders = vec![];
+    light_engine.spawn_light(lighting::Light::Ambient { color: Vector4::new(1.0, 1.0, 1.0, 1.0)}).unwrap();
 
     spawn_debug_colldier_world(&mut debug_colliders, &mut collision_world);
 
@@ -119,15 +129,18 @@ fn main() {
          */
 
         // World
+        lighting_renderer.update_target(&mut rl, &thread);
         let mut d = rl.begin_drawing(&thread);
+        lighting_renderer.clear_target(&mut d, &thread);
+        light_engine.update_shader_values(&mut lighting_renderer.shader, &camera, Vector2::new(d.get_screen_width() as f32, d.get_screen_height() as f32));
         d.clear_background(Color::BLACK);
-        game_world.render_bullets(&mut d, &camera, &mut collision_world);
+        game_world.render_bullets(&mut d, &thread, &camera, &mut collision_world, &mut lighting_renderer.target);
         for debug_collider in &debug_colliders {
-            debug_collider.draw(&collision_world, &camera, &mut d);
+            debug_collider.draw(&collision_world, &camera, &mut d, &thread, &mut lighting_renderer.target);
         }
-        game_world.render_corpses(&camera, &mut d, &assets);
-        game_world.render_dummies(&player, &camera, &mut collision_world, &mut d, &assets);
-        player.render(&mut d, &camera, &mut collision_world, &assets);
+        game_world.render_corpses(&camera, &mut d, &assets, &thread, &mut lighting_renderer.target);
+        game_world.render_dummies(&player, &camera, &mut collision_world, &mut d, &assets, &thread, &mut lighting_renderer.target);
+        player.render(&mut d, &camera, &mut collision_world, &assets, &thread, &mut lighting_renderer.target);
 
         // Debugger
         debugger.add(format!("Game FPS: {}", d.get_fps()));
@@ -145,7 +158,9 @@ fn main() {
             "Corpses: {:?}",
             game_world.corpses.len(),
         ));
-
+        let mut sh = d.begin_shader_mode(&lighting_renderer.shader);
+        sh.draw_texture(&mut lighting_renderer.target, 0, 0, Color::WHITE);
+        drop(sh);
         // UI
         debugger.draw(&mut d);
     }

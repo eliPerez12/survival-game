@@ -10,10 +10,13 @@ pub fn draw_shape(
     color: Color,
     d: &mut RaylibDrawHandle,
     camera: &Camera2D,
+    thread: &RaylibThread,
+    target: &mut RenderTexture2D,
 ) {
     let pos = isometry_shape.0.translation.vector.to_raylib_vector2();
     let angle = isometry_shape.0.rotation.angle().to_degrees();
     if let Some(collider) = isometry_shape.1.as_cuboid() {
+        let mut d = d.begin_texture_mode(thread, target);
         let half_extents = collider.half_extents.to_raylib_vector2();
         d.draw_rectangle_pro(
             Rectangle {
@@ -27,8 +30,10 @@ pub fn draw_shape(
             color,
         );
     } else if let Some(collider) = isometry_shape.1.as_ball() {
+        let mut d = d.begin_texture_mode(thread, target);
         d.draw_circle_v(camera.to_screen(pos), collider.radius * camera.zoom, color);
     } else if let Some(collider) = isometry_shape.1.as_triangle() {
+        let mut d = d.begin_texture_mode(thread, target);
         let points = (
             (collider.a.coords.to_raylib_vector2().rotated(angle) + pos),
             (collider.c.coords.to_raylib_vector2().rotated(angle) + pos),
@@ -43,7 +48,7 @@ pub fn draw_shape(
     } else if let Some(collider) = isometry_shape.1.as_compound() {
         for (mut isometery, shape) in collider.shapes() {
             isometery.translation.vector += isometry_shape.0.translation.vector;
-            draw_shape((isometery, &*shape.0), color, d, camera);
+            draw_shape((isometery, &*shape.0), color, d, camera, thread, target);
         }
     }
 }
