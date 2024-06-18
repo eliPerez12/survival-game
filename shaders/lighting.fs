@@ -1,6 +1,6 @@
 #version 460
 
-const int MAX_LIGHTS = 160;
+const int MAX_LIGHTS = 170;
 
 uniform sampler2D textureSampler;
 uniform vec2 screenSize;

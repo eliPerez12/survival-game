@@ -1,1 +1,23 @@
-rt
+//     let texture =  assets.get_texture("error.png");
+            //     let dest_rect = &Rectangle::new(
+            //         x as f32 * texture.width() as f32 * scale,
+            //         y as f32 * texture.height() as f32 * scale,
+            //         texture.width() as f32 * scale,
+            //         texture.width() as f32 * scale,
+            //     );
+            //     if camera_world_rect.check_collision_recs(dest_rect) {
+            //         d.draw_texture_pro(
+            //             texture,
+            //             Rectangle::new(
+            //                 0.0,
+            //                 0.0,
+            //                 texture.width() as f32,
+            //                 texture.height() as f32,
+            //             ),
+            //             camera.to_screen_rect(dest_rect),
+            //             Vector2::zero(),
+            //             0.0,
+            //             Color::WHITE,
+            //         );
+            //     }
+            // }

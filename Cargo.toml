@@ -13,9 +13,13 @@ opt-level = 3
 [profile.dev.package.raylib]
 opt-level = 3
 
+
+
 [dependencies]
 rapier2d = { version = "*", features = [ "simd-stable" ] }
 rand = "*"
+libnoise = "1.1"
+tiled = "*"
 
 [dependencies.raylib]
 version = "5.0.0"

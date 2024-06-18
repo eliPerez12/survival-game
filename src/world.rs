@@ -56,7 +56,9 @@ impl GameWorld {
         }
 
         self.bullets.retain(|bullet_handle| {
-            if bullet_handle.get_linvel(collision_world).length() < drag_amount * rl.get_frame_time() {
+            if bullet_handle.get_linvel(collision_world).length()
+                < drag_amount * rl.get_frame_time()
+            {
                 collision_world.delete_collider(bullet_handle.clone());
                 false
             } else {
@@ -73,11 +75,9 @@ impl GameWorld {
         collision_world: &mut CollisionWorld,
         target: &mut RenderTexture2D,
     ) {
-        let camera_world_rect = camera.to_world_rect(&Rectangle::new(
-            0.0,
-            0.0,
-            d.get_screen_width() as f32 * 1.1,
-            d.get_screen_height() as f32 * 1.1,
+        let camera_world_rect = camera.get_visible_rect(Vector2::new(
+            d.get_screen_width() as f32,
+            d.get_screen_height() as f32,
         ));
         for bullet in &self.bullets {
             let bounding_sphere = bullet.get_bounding_sphere(collision_world);
@@ -96,13 +96,11 @@ impl GameWorld {
         d: &mut RaylibDrawHandle,
         assets: &Assets,
         thread: &RaylibThread,
-        target: &mut RenderTexture2D
+        target: &mut RenderTexture2D,
     ) {
-        let camera_world_rect = camera.to_world_rect(&Rectangle::new(
-            0.0,
-            0.0,
-            d.get_screen_width() as f32 * 1.25,
-            d.get_screen_height() as f32 * 1.25,
+        let camera_world_rect = camera.get_visible_rect(Vector2::new(
+            d.get_screen_width() as f32,
+            d.get_screen_height() as f32,
         ));
         for corpse in &self.corpses {
             if camera_world_rect.check_collision_point_rec(corpse.pos) {
@@ -110,7 +108,8 @@ impl GameWorld {
             }
         }
     }
-
+    //TODO: Fix too many args
+    #[allow(clippy::too_many_arguments)]
     pub fn render_dummies(
         &self,
         player: &Player,
@@ -121,11 +120,9 @@ impl GameWorld {
         thread: &RaylibThread,
         target: &mut RenderTexture2D,
     ) {
-        let camera_world_rect = camera.to_world_rect(&Rectangle::new(
-            0.0,
-            0.0,
-            d.get_screen_width() as f32 * 1.25,
-            d.get_screen_height() as f32 * 1.25,
+        let camera_world_rect = camera.get_visible_rect(Vector2::new(
+            d.get_screen_width() as f32,
+            d.get_screen_height() as f32,
         ));
         for dummy in &self.dummies {
             let bounding_sphere = dummy.collider.get_bounding_sphere(collision_world);
@@ -174,7 +171,6 @@ impl GameWorld {
                         Color::YELLOW,
                     );
                 } else {
-
                     dummy.render(d, camera, collision_world, assets, thread, target);
                 }
             }
@@ -186,11 +182,11 @@ pub fn spawn_debug_colldier_world(
     debug_colliders: &mut Vec<WorldColliderHandle>,
     collision_world: &mut CollisionWorld,
 ) {
-    for _ in 0..100 {
-        let size_x = rand::thread_rng().gen_range(2.0..5.0);
-        let size_y = rand::thread_rng().gen_range(2.0..5.0);
-        let pos_x = rand::thread_rng().gen_range(-50.0..50.0);
-        let pos_y = rand::thread_rng().gen_range(-50.0..50.0);
+    for _ in 0..10 {
+        let size_x = rand::thread_rng().gen_range(1.0..6.4);
+        let size_y = rand::thread_rng().gen_range(1.0..6.4);
+        let pos_x = rand::thread_rng().gen_range(0.0..10.0 * 6.4);
+        let pos_y = rand::thread_rng().gen_range(0.0..10.0 * 6.4);
         debug_colliders.push(collision_world.spawn_collider(
             RigidBodyArgs {
                 dynamic: false,

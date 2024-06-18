@@ -25,12 +25,19 @@ impl Corpse {
                 self.time_elapsed += rl.get_frame_time();
             }
         }
-
     }
 
-    pub fn render(&self, d: &mut RaylibDrawHandle, assets: &Assets, camera: &Camera2D, thread: &RaylibThread, target: &mut RenderTexture2D) {
+    pub fn render(
+        &self,
+        d: &mut RaylibDrawHandle,
+        assets: &Assets,
+        camera: &Camera2D,
+        thread: &RaylibThread,
+        target: &mut RenderTexture2D,
+    ) {
         let mut d = d.begin_texture_mode(thread, target);
-        let corpse_texture = assets.get_texture(&format!("corpses/corpse{}.png", self.animation_stage));
+        let corpse_texture =
+            assets.get_texture(&format!("corpses/corpse{}.png", self.animation_stage));
         let scale = 0.1;
         //d.draw_circle_v(camera.to_screen(self.pos), 1.0 * camera.zoom, Color::WHITE);
         d.draw_texture_pro(
@@ -83,15 +90,19 @@ impl Player {
 
     pub fn aim_at(&mut self, world_pos: Vector2, collision_world: &mut CollisionWorld) {
         self.angle = self
-        .collider
-        .get_pos(collision_world)
-        .angle_to(world_pos)
-        .to_degrees()
-        - 90.0;
-
+            .collider
+            .get_pos(collision_world)
+            .angle_to(world_pos)
+            .to_degrees()
+            - 90.0;
     }
 
-    pub fn control_movement(&mut self, rl: &RaylibHandle, camera: &Camera2D, collision_world: &mut CollisionWorld) {
+    pub fn control_movement(
+        &mut self,
+        rl: &RaylibHandle,
+        camera: &Camera2D,
+        collision_world: &mut CollisionWorld,
+    ) {
         let mut movement_vector = Vector2::new(0.0, 0.0);
         if rl.is_key_down(KeyboardKey::KEY_W) {
             movement_vector.y -= 1.0;
@@ -106,12 +117,12 @@ impl Player {
             movement_vector.x += 1.0;
         }
         self.angle = self
-        .collider
-        .get_pos(collision_world)
-        .angle_to(camera.to_world(rl.get_mouse_position()))
-        .to_degrees()
-        - 90.0;
-        self.handle_movement(rl,collision_world, &mut movement_vector);
+            .collider
+            .get_pos(collision_world)
+            .angle_to(camera.to_world(rl.get_mouse_position()))
+            .to_degrees()
+            - 90.0;
+        self.handle_movement(rl, collision_world, &mut movement_vector);
     }
 
     pub fn handle_movement(
@@ -206,7 +217,7 @@ impl Player {
                     user_data: ColliderUserData::BULLET,
                 },
                 ColliderArgs {
-                    density: 1.5,
+                    density: 5.5,
                     restitution: 0.1,
                     friction: 0.7,
                     user_data: ColliderUserData::BULLET,
@@ -271,17 +282,22 @@ impl Player {
             self.angle,
             Color::WHITE,
         );
-        let font_size = 1.0;
-        d.draw_text(
-            &self.health.to_string(),
-            camera.to_screen_x(player_pos.x - font_size / 2.0) as i32,
-            camera.to_screen_y(player_pos.y - font_size / 2.0) as i32,
-            (1.0 * camera.zoom) as i32,
-            Color::WHITE,
-        );
+        // let font_size = 1.0;
+        // d.draw_text(
+        //     &self.health.to_string(),
+        //     camera.to_screen_x(player_pos.x - font_size / 2.0) as i32,
+        //     camera.to_screen_y(player_pos.y - font_size / 2.0) as i32,
+        //     (1.0 * camera.zoom) as i32,
+        //     Color::WHITE,
+        // );
     }
 
     pub fn get_corpse(&self, collision_world: &mut CollisionWorld) -> Corpse {
-            Corpse { pos: self.collider.get_pos(collision_world), animation_stage: 1, time_elapsed: 0.0, angle: self.angle }
+        Corpse {
+            pos: self.collider.get_pos(collision_world),
+            animation_stage: 1,
+            time_elapsed: 0.0,
+            angle: self.angle,
+        }
     }
 }

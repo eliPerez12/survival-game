@@ -1,6 +1,5 @@
-use std::collections::HashMap;
 use raylib::prelude::*;
-
+use std::collections::HashMap;
 
 pub struct Assets {
     textures: HashMap<String, Texture2D>,

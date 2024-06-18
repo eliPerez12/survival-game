@@ -118,6 +118,6 @@ impl WorldColliderHandle {
         target: &mut RenderTexture2D,
     ) {
         let isometry_shape = self.get_isometry_shape(collision_world);
-        draw_shape(isometry_shape, Color::RED, d, camera, thread, target);
+        draw_shape(isometry_shape, Color::WHITE, d, camera, thread, target);
     }
 }

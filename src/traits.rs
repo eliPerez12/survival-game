@@ -10,6 +10,7 @@ pub trait ImprovedCamera {
     fn to_world(&self, screen_pos: Vector2) -> Vector2;
     fn track(&mut self, pos: Vector2, screen_size: Vector2);
     fn get_world_pos(&self, offset: Vector2, screen_size: Vector2) -> Vector2;
+    fn get_visible_rect(&self, screen_pos: Vector2) -> Rectangle;
     fn get_screen_offset(&self, world_pos: Vector2, screen_size: Vector2) -> Vector2;
 
     fn handle_camera_controls(&mut self, rl: &RaylibHandle);
@@ -60,6 +61,15 @@ impl ImprovedCamera for Camera2D {
 
     fn get_screen_offset(&self, world_pos: Vector2, screen_size: Vector2) -> Vector2 {
         -world_pos + screen_size / 2.0 / self.zoom
+    }
+
+    fn get_visible_rect(&self, screen_size: Vector2) -> Rectangle {
+        self.to_world_rect(&Rectangle::new(
+            0.0,
+            0.0,
+            screen_size.x * 1.25,
+            screen_size.y * 1.25,
+        ))
     }
 
     fn handle_camera_controls(&mut self, rl: &RaylibHandle) {
