@@ -48,7 +48,7 @@ impl GameWorld {
         rl: &RaylibHandle,
         collision_world: &mut CollisionWorld,
     ) {
-        let drag_amount = 50.0;
+        let drag_amount = 25.0;
         for bullet in &mut self.bullets {
             let drag_dir = -bullet.get_linvel(collision_world).normalized();
             let drag_vector = drag_dir * drag_amount * rl.get_frame_time();

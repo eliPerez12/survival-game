@@ -22,30 +22,41 @@ mod traits;
 mod world;
 mod world_collider;
 
-fn render_map(map: &Map, d: &mut RaylibDrawHandle, camera: &Camera2D, assets: &Assets) {
+fn render_map(
+    map: &Map,
+    d: &mut RaylibDrawHandle,
+    camera: &Camera2D,
+    assets: &Assets,
+    thread: &RaylibThread,
+    target: &mut RenderTexture2D,
+) {
+    let mut d = d.begin_texture_mode(thread, target);
     let scale = 0.1;
-    let texture =  assets.get_texture("Tilelist.png");
-    let camera_world_rect =  camera.get_visible_rect(Vector2::new(d.get_screen_width() as f32, d.get_screen_height() as f32));
+    let texture = assets.get_texture("tiles/tilelist.png");
+    let camera_world_rect = camera.get_visible_rect(Vector2::new(
+        d.get_screen_width() as f32,
+        d.get_screen_height() as f32,
+    ));
     let tileset = map.tilesets().first().unwrap();
     for layer in map.layers() {
         let tile_layer = layer.as_tile_layer().unwrap();
         for y in 0..tile_layer.width().unwrap() {
             for x in 0..tile_layer.height().unwrap() {
-                let tile_id = tile_layer.get_tile(x as i32, y as i32).unwrap();
-                let tileset_index = tile_id.tileset_index();
-                let source_rect = Rectangle::new(
-                    (tileset_index / tileset.tile_width as usize) as f32,
-                    (tileset_index % tileset.tile_width as usize) as f32,
-                    tileset.tile_width as f32,
-                    tileset.tile_height as f32,
-                );
-                let dest_rect = Rectangle::new(
-                    x as f32 * texture.width() as f32 * scale,
-                    y as f32 * texture.height() as f32 * scale,
-                    texture.width() as f32 * scale,
-                    texture.width() as f32 * scale,
-                );
-                if camera_world_rect.check_collision_recs(&dest_rect) {
+                if let Some(tile_id) = tile_layer.get_tile(x as i32, y as i32) {
+                    let tileset_index = tile_id.id();
+                    let source_rect = Rectangle::new(
+                        (tileset_index / tileset.columns) as f32 * 64.0,
+                        (tileset_index % tileset.columns) as f32 * 64.0,
+                        tileset.tile_width as f32,
+                        tileset.tile_height as f32,
+                    );
+                    let dest_rect = Rectangle::new(
+                        x as f32 * tileset.tile_width as f32 * scale,
+                        y as f32 * tileset.tile_height as f32 * scale,
+                        tileset.tile_width as f32 * scale,
+                        tileset.tile_height as f32 * scale,
+                    );
+                    // if camera_world_rect.check_collision_recs(&dest_rect) {
                     d.draw_texture_pro(
                         texture,
                         source_rect,
@@ -54,6 +65,7 @@ fn render_map(map: &Map, d: &mut RaylibDrawHandle, camera: &Camera2D, assets: &A
                         0.0,
                         Color::WHITE,
                     );
+                    // }
                 }
             }
         }
@@ -85,8 +97,10 @@ fn main() {
             color: Vector4::new(1.0, 1.0, 1.0, 1.0),
         })
         .unwrap();
-    
-    let map = tiled::Loader::new().load_tmx_map("maps/map.tmx").unwrap();
+
+    let map = tiled::Loader::new()
+        .load_tmx_map("maps/untitled.tmx")
+        .unwrap();
 
     spawn_debug_colldier_world(&mut debug_colliders, &mut collision_world);
 
@@ -130,7 +144,14 @@ fn main() {
             Vector2::new(d.get_screen_width() as f32, d.get_screen_height() as f32),
         );
         d.clear_background(Color::BLACK);
-        render_map(&map, &mut d, &camera, &assets);
+        render_map(
+            &map,
+            &mut d,
+            &camera,
+            &assets,
+            &thread,
+            &mut lighting_renderer.target,
+        );
         game_world.render_bullets(
             &mut d,
             &thread,

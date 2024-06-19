@@ -4,6 +4,7 @@ use crate::Assets;
 use crate::GameWorld;
 use crate::ImprovedCamera;
 use crate::RaylibVector2;
+use rand::Rng;
 use raylib::prelude::*;
 
 // TODO: make private
@@ -68,6 +69,7 @@ pub struct Player {
     pub collider: WorldColliderHandle,
     pub angle: f32,
     pub health: f32,
+    pub time_since_shot: f32,
 }
 
 impl Player {
@@ -85,6 +87,7 @@ impl Player {
             ),
             health: 100.0,
             angle: 0.0,
+            time_since_shot: 0.0,
         }
     }
 
@@ -152,6 +155,7 @@ impl Player {
         bullets: &mut Vec<WorldColliderHandle>,
     ) {
         let mut bullet = None;
+        let player_deflection_level = 30.0;
         for collision in collision_world
             .rapier
             .narrow_phase
@@ -173,7 +177,6 @@ impl Player {
             let other_rigid_body_handle = other_collider.parent().unwrap();
             let other_rigid_body = &collision_world.rapier.rigid_body_set[other_rigid_body_handle];
             let other_collider_speed = other_rigid_body.linvel().to_raylib_vector2().length();
-            let player_deflection_level = 40.0;
             if other_rigid_body.user_data == ColliderUserData::BULLET
                 && dbg!(other_collider_speed) > player_deflection_level
             {
@@ -199,21 +202,25 @@ impl Player {
     }
 
     pub fn handle_shooting(
-        &self,
+        &mut self,
         rl: &mut RaylibHandle,
         collision_world: &mut CollisionWorld,
         bullets: &mut Vec<WorldColliderHandle>,
         aimed_at: Vector2,
     ) {
-        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+        let accuracy = 50.0;
+        let bullet_speed = 100.0;
+        let max_angle = std::f32::consts::PI / 2.0 / accuracy;
+        let random_accuracy_angle = rand::thread_rng().gen_range(-max_angle..max_angle);
+        if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) && self.time_since_shot > 0.1 {
+            self.time_since_shot = 0.0;
             let d = (aimed_at - self.collider.get_pos(collision_world)).normalized();
-            let bullet_speed = 75.0;
             let bullet_radius = 0.1;
             bullets.push(collision_world.spawn_collider(
                 RigidBodyArgs {
                     dynamic: true,
                     pos: self.collider.get_pos(collision_world) + d * 1.5,
-                    vel: d * bullet_speed + self.collider.get_linvel(collision_world),
+                    vel: d.rotated(random_accuracy_angle) * bullet_speed,
                     user_data: ColliderUserData::BULLET,
                 },
                 ColliderArgs {
@@ -226,6 +233,8 @@ impl Player {
                     radius: bullet_radius,
                 },
             ));
+        } else {
+            self.time_since_shot += rl.get_frame_time();
         }
     }
 
