@@ -182,7 +182,7 @@ pub fn spawn_debug_colldier_world(
     debug_colliders: &mut Vec<WorldColliderHandle>,
     collision_world: &mut CollisionWorld,
 ) {
-    for _ in 0..10 {
+    for _ in 0..0 {
         let size_x = rand::thread_rng().gen_range(1.0..6.4);
         let size_y = rand::thread_rng().gen_range(1.0..6.4);
         let pos_x = rand::thread_rng().gen_range(0.0..10.0 * 6.4);

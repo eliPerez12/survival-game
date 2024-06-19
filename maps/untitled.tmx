@@ -3,9 +3,9 @@
  <tileset firstgid="1" source="../tilesets/ground_tiles.tsx"/>
  <layer id="1" name="Tile Layer 1" width="3" height="3">
   <data encoding="csv">
-36,36,36,
-36,36,36,
-36,36,36
+2,2,2,
+2,2,2,
+2,2,2
 </data>
  </layer>
 </map>

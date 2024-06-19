@@ -37,6 +37,7 @@ fn render_map(
         d.get_screen_width() as f32,
         d.get_screen_height() as f32,
     ));
+
     let tileset = map.tilesets().first().unwrap();
     for layer in map.layers() {
         let tile_layer = layer.as_tile_layer().unwrap();
@@ -45,16 +46,16 @@ fn render_map(
                 if let Some(tile_id) = tile_layer.get_tile(x as i32, y as i32) {
                     let tileset_index = tile_id.id();
                     let source_rect = Rectangle::new(
-                        (tileset_index / tileset.columns) as f32 * 64.0,
                         (tileset_index % tileset.columns) as f32 * 64.0,
+                        (tileset_index / tileset.columns) as f32 * 64.0,
                         tileset.tile_width as f32,
                         tileset.tile_height as f32,
                     );
                     let dest_rect = Rectangle::new(
                         x as f32 * tileset.tile_width as f32 * scale,
                         y as f32 * tileset.tile_height as f32 * scale,
-                        tileset.tile_width as f32 * scale,
-                        tileset.tile_height as f32 * scale,
+                        tileset.tile_width as f32 * scale * 1.001,
+                        tileset.tile_height as f32 * scale * 1.001,
                     );
                     // if camera_world_rect.check_collision_recs(&dest_rect) {
                     d.draw_texture_pro(
@@ -98,9 +99,7 @@ fn main() {
         })
         .unwrap();
 
-    let map = tiled::Loader::new()
-        .load_tmx_map("maps/untitled.tmx")
-        .unwrap();
+    let map = tiled::Loader::new().load_tmx_map("maps/map.tmx").unwrap();
 
     spawn_debug_colldier_world(&mut debug_colliders, &mut collision_world);
 
@@ -113,7 +112,7 @@ fn main() {
         player.apply_collision_damage(&mut collision_world, &mut game_world.bullets);
         game_world.handle_corpses(&rl);
         game_world.handle_dummies(&mut rl, &player, &mut collision_world);
-        player.control_movement(&rl, &camera, &mut collision_world);
+        player.handle_controls(&rl, &camera, &mut collision_world);
         player.handle_shooting(
             &mut rl,
             &mut collision_world,
@@ -127,7 +126,6 @@ fn main() {
         );
         player.handle_spawning_dunmmies(&rl, &camera, &mut collision_world, &mut game_world);
         game_world.handle_bullet_physics(&rl, &mut collision_world);
-
         collision_world.step(&rl);
 
         /*
@@ -210,6 +208,53 @@ fn main() {
         sh.draw_texture(&mut lighting_renderer.target, 0, 0, Color::WHITE);
         drop(sh);
         // UI
+        if player.inventory_open {
+            let screen_size = Vector2::new(d.get_screen_width() as f32, d.get_screen_height() as f32);
+            let texture = assets.get_texture("inventory.png");
+            let texture_size = Vector2::new(texture.width() as f32, texture.height() as f32);
+            let scale = 5.0;
+            let inventory_top_left = Vector2::new(screen_size.x / 2.0, screen_size.y)
+                - Vector2::new(texture_size.x / 2.0 * scale, texture_size.y * scale);
+                d.draw_rectangle(0, 0, screen_size.x as i32, screen_size.y as i32, Color::new(0, 0, 0, 100));
+            let inventory_slot_pos = (3, 1);
+            d.draw_texture_pro(
+                texture,
+                Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width: texture_size.x,
+                    height: texture_size.y,
+                },
+                Rectangle {
+                    x: inventory_top_left.x,
+                    y: inventory_top_left.y,
+                    width: texture_size.x * scale,
+                    height: texture_size.y * scale,
+                },
+                Vector2::zero(),
+                0.0,
+                Color::new(255, 255, 255, 220),
+            );
+            let texture = assets.get_texture("417.png");
+            d.draw_texture_pro(
+                texture,
+                Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width: texture.width() as f32,
+                    height: texture.height() as f32,
+                },
+                Rectangle {
+                    x: inventory_top_left.x + (inventory_slot_pos.0 as f32 * 17.0 * scale) + (4.0 * scale),
+                    y: inventory_top_left.y + (inventory_slot_pos.1 as f32 * 17.0 * scale) + (4.0 * scale),
+                    width: texture.width() as f32 * scale,
+                    height: texture.height() as f32 * scale,
+                },
+                Vector2::zero(),
+                0.0,
+                Color::new(255, 255, 255, 255),
+            );
+        }
         debugger.draw(&mut d);
     }
 }

@@ -70,6 +70,7 @@ pub struct Player {
     pub angle: f32,
     pub health: f32,
     pub time_since_shot: f32,
+    pub inventory_open: bool,
 }
 
 impl Player {
@@ -88,6 +89,7 @@ impl Player {
             health: 100.0,
             angle: 0.0,
             time_since_shot: 0.0,
+            inventory_open: false,
         }
     }
 
@@ -100,7 +102,7 @@ impl Player {
             - 90.0;
     }
 
-    pub fn control_movement(
+    pub fn handle_controls(
         &mut self,
         rl: &RaylibHandle,
         camera: &Camera2D,
@@ -119,12 +121,14 @@ impl Player {
         if rl.is_key_down(KeyboardKey::KEY_D) {
             movement_vector.x += 1.0;
         }
-        self.angle = self
-            .collider
-            .get_pos(collision_world)
-            .angle_to(camera.to_world(rl.get_mouse_position()))
-            .to_degrees()
-            - 90.0;
+
+        if rl.is_key_pressed(KeyboardKey::KEY_I) {
+            self.inventory_open = !self.inventory_open;
+        }
+        if !self.inventory_open {
+            self.aim_at(camera.to_world(rl.get_mouse_position()), collision_world);
+        }
+        
         self.handle_movement(rl, collision_world, &mut movement_vector);
     }
 
