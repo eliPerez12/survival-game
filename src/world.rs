@@ -1,5 +1,6 @@
 use crate::{
-    collision_world::*, lighting::LightEngine, lighting_renderer::LightingRenderer, traits::*, world_collider::WorldColliderHandle, Assets, Corpse, Player
+    collision_world::*, lighting::LightEngine, lighting_renderer::LightingRenderer, traits::*,
+    world_collider::WorldColliderHandle, Assets, Corpse, Player,
 };
 use rand::Rng;
 use raylib::prelude::*;
@@ -60,7 +61,7 @@ impl GameWorld {
         rl: &mut RaylibHandle,
         player: &Player,
         collision_world: &mut CollisionWorld,
-        light_engine: &mut LightEngine
+        light_engine: &mut LightEngine,
     ) {
         for dummy in &mut self.dummies {
             dummy.apply_collision_damage(collision_world, &mut self.bullets);

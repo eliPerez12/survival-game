@@ -7,10 +7,10 @@ use assets::Assets;
 use collision_world::*;
 use debug::DebugInfo;
 use game_map::GameMap;
+use inventory::*;
 use lighting::Light;
 use lighting::LightEngine;
 use lighting_renderer::LightingRenderer;
-use inventory::*;
 use raylib::prelude::*;
 use world::*;
 
@@ -19,6 +19,7 @@ mod collision_world;
 mod debug;
 mod draw_collider;
 mod game_map;
+mod inventory;
 mod lighting;
 mod lighting_renderer;
 mod player;
@@ -26,7 +27,6 @@ mod rapier_world;
 mod traits;
 mod world;
 mod world_collider;
-mod inventory;
 
 fn main() {
     let (mut rl, thread) = raylib::init()
@@ -55,9 +55,22 @@ fn main() {
         .unwrap();
 
     let map = GameMap::load_map("maps/map.tmx");
-    let mut inventory = Inventory{items: HashMap::new(), selected_item: None};
-    inventory.items.insert((0, 0), InventoryItem{rotated: false, size: (4, 2)});
-    inventory.items.insert((4, 0), InventoryItem{rotated: true, size: (4, 2)});
+    let mut inventory = Inventory {
+        items: HashMap::new(),
+        selected_item: None,
+    };
+    inventory.items.insert(
+        (0, 0),
+        Item::Rifle.as_inventory_item(false),
+    );
+    inventory.items.insert(
+        (4, 0),
+        Item::Pistol.as_inventory_item(true),
+    );
+    inventory.items.insert(
+        (6, 0),
+        Item::MedKit.as_inventory_item(false),
+    );
 
     spawn_debug_colldier_world(&mut debug_colliders, &mut collision_world);
 
@@ -159,6 +172,7 @@ fn main() {
         drop(sh);
         // UI
         inventory.render(&mut d, &player, &assets);
-        debugger.draw(&mut d);  
+        debugger.add(format!("{:?}", inventory.selected_item));
+        debugger.draw(&mut d);
     }
 }

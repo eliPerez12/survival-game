@@ -80,7 +80,7 @@ impl Player {
     const WALKING_SPEED: f32 = 3.5;
     const SPRINTING_SPEED: f32 = 7.5;
     const WALKING_ACCELERATION: f32 = 10.0;
-    const WALKING_DEACCELERATION: f32 = 18.0;
+    //const WALKING_DEACCELERATION: f32 = 18.0;
 
     pub fn new(collision_world: &mut CollisionWorld, light_engine: &mut LightEngine) -> Self {
         let pos = Vector2::new(20.0, 20.0);
@@ -209,7 +209,8 @@ impl Player {
             if other_rigid_body.user_data == ColliderUserData::BULLET
                 && dbg!(other_collider_speed) > player_deflection_level
             {
-                let bullet_damage = (other_collider_speed/2.0 - player_deflection_level).clamp(0.0, 25.0);
+                let bullet_damage =
+                    (other_collider_speed / 2.0 - player_deflection_level).clamp(0.0, 25.0);
                 self.health -= dbg!(bullet_damage);
                 bullet = Some((
                     WorldColliderHandle {
@@ -237,7 +238,9 @@ impl Player {
         bullets: &mut Vec<WorldColliderHandle>,
         aimed_at: Vector2,
     ) {
-        let accuracy = 13.0 / (self.collider.get_linvel(collision_world).length()/Self::WALKING_SPEED * 2.0).max(1.0);
+        let accuracy = 13.0
+            / (self.collider.get_linvel(collision_world).length() / Self::WALKING_SPEED * 2.0)
+                .max(1.0);
         let bullet_speed = 150.0;
         let max_angle = std::f32::consts::PI / 2.0 / accuracy;
         let random_accuracy_angle = rand::thread_rng().gen_range(-max_angle..max_angle);
