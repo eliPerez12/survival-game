@@ -55,11 +55,9 @@ fn main() {
         .unwrap();
 
     let map = GameMap::load_map("maps/map.tmx");
-    let mut inventory = Inventrory{grids: HashMap::new()};
-    inventory.grids.insert((0, 0), true);
-    inventory.grids.insert((2, 0), true);
-    inventory.grids.insert((4, 0), true);
-    inventory.grids.insert((6, 0), true);
+    let mut inventory = Inventrory{items: HashMap::new()};
+    inventory.items.insert((0, 0), InventoryItem{rotated: true});
+    inventory.items.insert((2, 0), InventoryItem{rotated: false});
 
     spawn_debug_colldier_world(&mut debug_colliders, &mut collision_world);
 

@@ -4,11 +4,17 @@ use raylib::prelude::*;
 
 use crate::{assets::Assets, Player};
 
-pub struct Inventrory {
-    pub grids: HashMap<(u32, u32), bool>
+pub struct InventoryItem {
+    pub rotated: bool,
 }
 
+pub struct Inventrory {
+    pub items: HashMap<(u32, u32), InventoryItem>
+}
+
+
 impl Inventrory {
+
     pub fn render(&self, d: &mut RaylibDrawHandle, player: &Player, assets: &Assets) {
         if player.inventory_open {
             let screen_size =
@@ -44,8 +50,8 @@ impl Inventrory {
                 Color::new(255, 255, 255, 220),
             );
             let texture = assets.get_texture("417.png"); // Drawing items
-            for (grid_pos, rotated) in &self.grids {
-                let rotation_offset = if *rotated {
+            for (grid_pos, item) in &self.items {
+                let rotation_offset = if item.rotated {
                     texture.width() as f32 / 2.0 * scale - 2.5
                 } else {
                     0.0
@@ -72,7 +78,7 @@ impl Inventrory {
                         height: texture.height() as f32 * scale,
                     },
                     Vector2::new(0.0, 0.0),
-                    if *rotated { 90.0 } else { 0.0 },
+                    if item.rotated { 90.0 } else { 0.0 },
                     Color::new(255, 255, 255, 255),
                 );
             }

@@ -248,7 +248,7 @@ impl Player {
             bullets.push(collision_world.spawn_collider(
                 RigidBodyArgs {
                     dynamic: true,
-                    pos: self.collider.get_pos(collision_world) + d * 1.5,
+                    pos: self.collider.get_pos(collision_world) + d * 2.0,
                     vel: d.rotated(random_accuracy_angle) * bullet_speed,
                     user_data: ColliderUserData::BULLET,
                 },
