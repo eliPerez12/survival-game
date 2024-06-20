@@ -55,9 +55,9 @@ fn main() {
         .unwrap();
 
     let map = GameMap::load_map("maps/map.tmx");
-    let mut inventory = Inventrory{items: HashMap::new()};
-    inventory.items.insert((0, 0), InventoryItem{rotated: true});
-    inventory.items.insert((2, 0), InventoryItem{rotated: false});
+    let mut inventory = Inventory{items: HashMap::new(), selected_item: None};
+    inventory.items.insert((0, 0), InventoryItem{rotated: false, size: (4, 2)});
+    inventory.items.insert((4, 0), InventoryItem{rotated: true, size: (4, 2)});
 
     spawn_debug_colldier_world(&mut debug_colliders, &mut collision_world);
 
@@ -69,7 +69,7 @@ fn main() {
         debugger.update(&mut rl);
         player.apply_collision_damage(&mut collision_world, &mut game_world.bullets);
         game_world.handle_corpses(&rl);
-        game_world.handle_dummies(&mut rl, &player, &mut collision_world);
+        game_world.handle_dummies(&mut rl, &player, &mut collision_world, &mut light_engine);
         player.handle_controls(&rl, &camera, &mut collision_world);
         player.handle_shooting(
             &mut rl,

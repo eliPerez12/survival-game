@@ -77,8 +77,13 @@ pub struct Player {
 }
 
 impl Player {
+    const WALKING_SPEED: f32 = 3.5;
+    const SPRINTING_SPEED: f32 = 7.5;
+    const WALKING_ACCELERATION: f32 = 10.0;
+    const WALKING_DEACCELERATION: f32 = 18.0;
+
     pub fn new(collision_world: &mut CollisionWorld, light_engine: &mut LightEngine) -> Self {
-        let pos = Vector2::new(10.0, 20.0);
+        let pos = Vector2::new(20.0, 20.0);
         Player {
             collider: collision_world.spawn_collider(
                 RigidBodyArgs {
@@ -120,26 +125,24 @@ impl Player {
         collision_world: &mut CollisionWorld,
     ) {
         let mut movement_vector = Vector2::new(0.0, 0.0);
-        if rl.is_key_down(KeyboardKey::KEY_W) {
-            movement_vector.y -= 1.0;
+        if !self.inventory_open {
+            if rl.is_key_down(KeyboardKey::KEY_W) {
+                movement_vector.y -= 1.0;
+            }
+            if rl.is_key_down(KeyboardKey::KEY_S) {
+                movement_vector.y += 1.0;
+            }
+            if rl.is_key_down(KeyboardKey::KEY_A) {
+                movement_vector.x -= 1.0;
+            }
+            if rl.is_key_down(KeyboardKey::KEY_D) {
+                movement_vector.x += 1.0;
+            }
+            self.aim_at(camera.to_world(rl.get_mouse_position()), collision_world);
         }
-        if rl.is_key_down(KeyboardKey::KEY_S) {
-            movement_vector.y += 1.0;
-        }
-        if rl.is_key_down(KeyboardKey::KEY_A) {
-            movement_vector.x -= 1.0;
-        }
-        if rl.is_key_down(KeyboardKey::KEY_D) {
-            movement_vector.x += 1.0;
-        }
-
         if rl.is_key_pressed(KeyboardKey::KEY_I) {
             self.inventory_open = !self.inventory_open;
         }
-        if !self.inventory_open {
-            self.aim_at(camera.to_world(rl.get_mouse_position()), collision_world);
-        }
-
         self.handle_movement(rl, collision_world, &mut movement_vector);
     }
 
@@ -149,11 +152,11 @@ impl Player {
         collision_world: &mut CollisionWorld,
         movement_vector: &mut Vector2,
     ) {
-        let player_speed = 15.0 * self.collider.get_mass(collision_world);
+        let player_speed = Self::WALKING_ACCELERATION * self.collider.get_mass(collision_world);
         let player_acceleration = player_speed * rl.get_frame_time();
         let player_max_speed = match rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) {
-            false => 3.2,
-            true => 7.7,
+            false => Self::WALKING_SPEED,
+            true => Self::SPRINTING_SPEED,
         };
         let player_drag = player_speed / player_max_speed * rl.get_frame_time();
         let drag_vector = -self.collider.get_linvel(collision_world);
@@ -206,7 +209,7 @@ impl Player {
             if other_rigid_body.user_data == ColliderUserData::BULLET
                 && dbg!(other_collider_speed) > player_deflection_level
             {
-                let bullet_damage = (other_collider_speed - player_deflection_level).min(25.0);
+                let bullet_damage = (other_collider_speed/2.0 - player_deflection_level).clamp(0.0, 25.0);
                 self.health -= dbg!(bullet_damage);
                 bullet = Some((
                     WorldColliderHandle {
@@ -234,12 +237,12 @@ impl Player {
         bullets: &mut Vec<WorldColliderHandle>,
         aimed_at: Vector2,
     ) {
-        let accuracy = 50.0;
-        let bullet_speed = 100.0;
+        let accuracy = 13.0 / (self.collider.get_linvel(collision_world).length()/Self::WALKING_SPEED * 2.0).max(1.0);
+        let bullet_speed = 150.0;
         let max_angle = std::f32::consts::PI / 2.0 / accuracy;
         let random_accuracy_angle = rand::thread_rng().gen_range(-max_angle..max_angle);
         if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT)
-            && self.time_since_shot > 0.1
+            && self.time_since_shot > 0.05
             && !self.inventory_open
         {
             self.time_since_shot = 0.0;
@@ -321,14 +324,14 @@ impl Player {
             self.angle,
             Color::WHITE,
         );
-        // let font_size = 1.0;
-        // d.draw_text(
-        //     &self.health.to_string(),
-        //     camera.to_screen_x(player_pos.x - font_size / 2.0) as i32,
-        //     camera.to_screen_y(player_pos.y - font_size / 2.0) as i32,
-        //     (1.0 * camera.zoom) as i32,
-        //     Color::WHITE,
-        // );
+        let font_size = 1.0;
+        d.draw_text(
+            &self.health.to_string(),
+            camera.to_screen_x(player_pos.x - font_size / 2.0) as i32,
+            camera.to_screen_y(player_pos.y - font_size / 2.0) as i32,
+            (1.0 * camera.zoom) as i32,
+            Color::WHITE,
+        );
     }
 
     pub fn get_corpse(&self, collision_world: &mut CollisionWorld) -> Corpse {

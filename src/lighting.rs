@@ -182,6 +182,10 @@ impl LightEngine {
         }
     }
 
+    pub fn remove_light(&mut self, light_handle: &LightHandle) {
+        &mut self.lights.remove(&light_handle.0);
+    }
+
     pub fn update_light(&mut self, light_handle: &LightHandle, updated_light: Light) {
         self.lights.insert(light_handle.0, updated_light);
     }
@@ -192,6 +196,7 @@ impl LightEngine {
     pub fn spawned_lights(&self) -> usize {
         self.lights.len()
     }
+
 
     // Updating the shader with new uniform values
     pub fn update_shader_values(
