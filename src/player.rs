@@ -1,4 +1,7 @@
 use crate::collision_world::*;
+use crate::lighting::Light;
+use crate::lighting::LightEngine;
+use crate::lighting::LightHandle;
 use crate::world_collider::*;
 use crate::Assets;
 use crate::GameWorld;
@@ -40,7 +43,6 @@ impl Corpse {
         let corpse_texture =
             assets.get_texture(&format!("corpses/corpse{}.png", self.animation_stage));
         let scale = 0.1;
-        //d.draw_circle_v(camera.to_screen(self.pos), 1.0 * camera.zoom, Color::WHITE);
         d.draw_texture_pro(
             corpse_texture,
             Rectangle::new(
@@ -71,15 +73,17 @@ pub struct Player {
     pub health: f32,
     pub time_since_shot: f32,
     pub inventory_open: bool,
+    pub player_light: LightHandle,
 }
 
 impl Player {
-    pub fn new(collision_world: &mut CollisionWorld) -> Self {
+    pub fn new(collision_world: &mut CollisionWorld, light_engine: &mut LightEngine) -> Self {
+        let pos = Vector2::new(10.0, 20.0);
         Player {
             collider: collision_world.spawn_collider(
                 RigidBodyArgs {
                     dynamic: true,
-                    pos: Vector2::new(2.0, 2.0),
+                    pos,
                     vel: Vector2::zero(),
                     user_data: 0,
                 },
@@ -90,6 +94,13 @@ impl Player {
             angle: 0.0,
             time_since_shot: 0.0,
             inventory_open: false,
+            player_light: light_engine
+                .spawn_light(Light::Radial {
+                    pos,
+                    color: Vector4::new(1.0, 1.0, 1.0, 0.0),
+                    radius: 15.0,
+                })
+                .unwrap(),
         }
     }
 
@@ -128,7 +139,7 @@ impl Player {
         if !self.inventory_open {
             self.aim_at(camera.to_world(rl.get_mouse_position()), collision_world);
         }
-        
+
         self.handle_movement(rl, collision_world, &mut movement_vector);
     }
 
@@ -138,11 +149,11 @@ impl Player {
         collision_world: &mut CollisionWorld,
         movement_vector: &mut Vector2,
     ) {
-        let player_speed = 25.0 * self.collider.get_mass(collision_world);
+        let player_speed = 15.0 * self.collider.get_mass(collision_world);
         let player_acceleration = player_speed * rl.get_frame_time();
         let player_max_speed = match rl.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) {
-            false => 3.6,
-            true => 7.6,
+            false => 3.2,
+            true => 7.7,
         };
         let player_drag = player_speed / player_max_speed * rl.get_frame_time();
         let drag_vector = -self.collider.get_linvel(collision_world);
@@ -151,6 +162,17 @@ impl Player {
         movement_vector.normalize();
         self.collider
             .apply_impulse(*movement_vector * player_acceleration, collision_world);
+    }
+
+    pub fn update_player_light(
+        &mut self,
+        light_engine: &mut LightEngine,
+        collision_world: &mut CollisionWorld,
+    ) {
+        light_engine
+            .get_mut_light(&self.player_light)
+            .set_pos(self.collider.get_pos(collision_world))
+            .set_color(Vector4::new(1.0, 1.0, 1.0, 0.15));
     }
 
     pub fn apply_collision_damage(
@@ -216,7 +238,10 @@ impl Player {
         let bullet_speed = 100.0;
         let max_angle = std::f32::consts::PI / 2.0 / accuracy;
         let random_accuracy_angle = rand::thread_rng().gen_range(-max_angle..max_angle);
-        if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) && self.time_since_shot > 0.1 {
+        if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT)
+            && self.time_since_shot > 0.1
+            && !self.inventory_open
+        {
             self.time_since_shot = 0.0;
             let d = (aimed_at - self.collider.get_pos(collision_world)).normalized();
             let bullet_radius = 0.1;
@@ -248,11 +273,12 @@ impl Player {
         camera: &Camera2D,
         collision_world: &mut CollisionWorld,
         game_world: &mut GameWorld,
+        light_engine: &mut LightEngine,
     ) {
         let mouse_pos = rl.get_mouse_position();
         if rl.is_key_pressed(KeyboardKey::KEY_G) {
             game_world.dummies.push({
-                let dummy = Player::new(collision_world);
+                let dummy = Player::new(collision_world, light_engine);
                 dummy
                     .collider
                     .set_pos(camera.to_world(mouse_pos), collision_world);

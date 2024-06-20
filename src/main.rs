@@ -1,19 +1,24 @@
+use std::collections::HashMap;
+
 use crate::player::*;
 use crate::rapier_world::*;
 use crate::traits::*;
 use assets::Assets;
 use collision_world::*;
 use debug::DebugInfo;
+use game_map::GameMap;
+use lighting::Light;
 use lighting::LightEngine;
 use lighting_renderer::LightingRenderer;
+use inventory::*;
 use raylib::prelude::*;
-use tiled::Map;
 use world::*;
 
 mod assets;
 mod collision_world;
 mod debug;
 mod draw_collider;
+mod game_map;
 mod lighting;
 mod lighting_renderer;
 mod player;
@@ -21,68 +26,18 @@ mod rapier_world;
 mod traits;
 mod world;
 mod world_collider;
-
-fn render_map(
-    map: &Map,
-    d: &mut RaylibDrawHandle,
-    camera: &Camera2D,
-    assets: &Assets,
-    thread: &RaylibThread,
-    target: &mut RenderTexture2D,
-) {
-    let mut d = d.begin_texture_mode(thread, target);
-    let scale = 0.1;
-    let texture = assets.get_texture("tiles/tilelist.png");
-    let camera_world_rect = camera.get_visible_rect(Vector2::new(
-        d.get_screen_width() as f32,
-        d.get_screen_height() as f32,
-    ));
-
-    let tileset = map.tilesets().first().unwrap();
-    for layer in map.layers() {
-        let tile_layer = layer.as_tile_layer().unwrap();
-        for y in 0..tile_layer.width().unwrap() {
-            for x in 0..tile_layer.height().unwrap() {
-                if let Some(tile_id) = tile_layer.get_tile(x as i32, y as i32) {
-                    let tileset_index = tile_id.id();
-                    let source_rect = Rectangle::new(
-                        (tileset_index % tileset.columns) as f32 * 64.0,
-                        (tileset_index / tileset.columns) as f32 * 64.0,
-                        tileset.tile_width as f32,
-                        tileset.tile_height as f32,
-                    );
-                    let dest_rect = Rectangle::new(
-                        x as f32 * tileset.tile_width as f32 * scale,
-                        y as f32 * tileset.tile_height as f32 * scale,
-                        tileset.tile_width as f32 * scale * 1.001,
-                        tileset.tile_height as f32 * scale * 1.001,
-                    );
-                    // if camera_world_rect.check_collision_recs(&dest_rect) {
-                    d.draw_texture_pro(
-                        texture,
-                        source_rect,
-                        camera.to_screen_rect(&dest_rect),
-                        Vector2::zero(),
-                        0.0,
-                        Color::WHITE,
-                    );
-                    // }
-                }
-            }
-        }
-    }
-}
+mod inventory;
 
 fn main() {
     let (mut rl, thread) = raylib::init()
         .size(1080, 720)
         .resizable()
         .title("Physics")
-        .vsync()
+        //.vsync()
         .build();
     let mut camera = Camera2D {
         offset: Vector2::new(0.0, 0.0),
-        zoom: 100.0,
+        zoom: 50.0,
         ..Default::default()
     };
     let mut collision_world = CollisionWorld::default();
@@ -90,16 +45,21 @@ fn main() {
     let mut light_engine = LightEngine::new(&mut lighting_renderer.shader);
     let mut game_world = GameWorld::new();
     let mut debugger = DebugInfo::new();
-    let mut player = Player::new(&mut collision_world);
+    let mut player = Player::new(&mut collision_world, &mut light_engine);
     let assets = Assets::new(&mut rl, &thread);
     let mut debug_colliders = vec![];
     light_engine
-        .spawn_light(lighting::Light::Ambient {
+        .spawn_light(Light::Ambient {
             color: Vector4::new(1.0, 1.0, 1.0, 1.0),
         })
         .unwrap();
 
-    let map = tiled::Loader::new().load_tmx_map("maps/map.tmx").unwrap();
+    let map = GameMap::load_map("maps/map.tmx");
+    let mut inventory = Inventrory{grids: HashMap::new()};
+    inventory.grids.insert((0, 0), true);
+    inventory.grids.insert((2, 0), true);
+    inventory.grids.insert((4, 0), true);
+    inventory.grids.insert((6, 0), true);
 
     spawn_debug_colldier_world(&mut debug_colliders, &mut collision_world);
 
@@ -119,12 +79,19 @@ fn main() {
             &mut game_world.bullets,
             camera.to_world(mouse_pos),
         );
+        player.update_player_light(&mut light_engine, &mut collision_world);
         camera.handle_camera_controls(&rl);
         camera.track(
             player.collider.get_center_of_mass(&collision_world),
             Vector2::new(rl.get_screen_width() as f32, rl.get_screen_height() as f32),
         );
-        player.handle_spawning_dunmmies(&rl, &camera, &mut collision_world, &mut game_world);
+        player.handle_spawning_dunmmies(
+            &rl,
+            &camera,
+            &mut collision_world,
+            &mut game_world,
+            &mut light_engine,
+        );
         game_world.handle_bullet_physics(&rl, &mut collision_world);
         collision_world.step(&rl);
 
@@ -142,19 +109,11 @@ fn main() {
             Vector2::new(d.get_screen_width() as f32, d.get_screen_height() as f32),
         );
         d.clear_background(Color::BLACK);
-        render_map(
-            &map,
+        map.render_map(
             &mut d,
             &camera,
             &assets,
             &thread,
-            &mut lighting_renderer.target,
-        );
-        game_world.render_bullets(
-            &mut d,
-            &thread,
-            &camera,
-            &mut collision_world,
             &mut lighting_renderer.target,
         );
         for debug_collider in &debug_colliders {
@@ -166,21 +125,14 @@ fn main() {
                 &mut lighting_renderer.target,
             );
         }
-        game_world.render_corpses(
-            &camera,
+        game_world.render_entities(
             &mut d,
-            &assets,
             &thread,
-            &mut lighting_renderer.target,
-        );
-        game_world.render_dummies(
-            &player,
-            &camera,
+            &mut lighting_renderer,
             &mut collision_world,
-            &mut d,
+            &camera,
             &assets,
-            &thread,
-            &mut lighting_renderer.target,
+            &player,
         );
         player.render(
             &mut d,
@@ -208,53 +160,7 @@ fn main() {
         sh.draw_texture(&mut lighting_renderer.target, 0, 0, Color::WHITE);
         drop(sh);
         // UI
-        if player.inventory_open {
-            let screen_size = Vector2::new(d.get_screen_width() as f32, d.get_screen_height() as f32);
-            let texture = assets.get_texture("inventory.png");
-            let texture_size = Vector2::new(texture.width() as f32, texture.height() as f32);
-            let scale = 5.0;
-            let inventory_top_left = Vector2::new(screen_size.x / 2.0, screen_size.y)
-                - Vector2::new(texture_size.x / 2.0 * scale, texture_size.y * scale);
-                d.draw_rectangle(0, 0, screen_size.x as i32, screen_size.y as i32, Color::new(0, 0, 0, 100));
-            let inventory_slot_pos = (3, 1);
-            d.draw_texture_pro(
-                texture,
-                Rectangle {
-                    x: 0.0,
-                    y: 0.0,
-                    width: texture_size.x,
-                    height: texture_size.y,
-                },
-                Rectangle {
-                    x: inventory_top_left.x,
-                    y: inventory_top_left.y,
-                    width: texture_size.x * scale,
-                    height: texture_size.y * scale,
-                },
-                Vector2::zero(),
-                0.0,
-                Color::new(255, 255, 255, 220),
-            );
-            let texture = assets.get_texture("417.png");
-            d.draw_texture_pro(
-                texture,
-                Rectangle {
-                    x: 0.0,
-                    y: 0.0,
-                    width: texture.width() as f32,
-                    height: texture.height() as f32,
-                },
-                Rectangle {
-                    x: inventory_top_left.x + (inventory_slot_pos.0 as f32 * 17.0 * scale) + (4.0 * scale),
-                    y: inventory_top_left.y + (inventory_slot_pos.1 as f32 * 17.0 * scale) + (4.0 * scale),
-                    width: texture.width() as f32 * scale,
-                    height: texture.height() as f32 * scale,
-                },
-                Vector2::zero(),
-                0.0,
-                Color::new(255, 255, 255, 255),
-            );
-        }
-        debugger.draw(&mut d);
+        inventory.render(&mut d, &player, &assets);
+        debugger.draw(&mut d);  
     }
 }

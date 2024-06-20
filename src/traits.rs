@@ -67,8 +67,8 @@ impl ImprovedCamera for Camera2D {
         self.to_world_rect(&Rectangle::new(
             0.0,
             0.0,
-            screen_size.x * 1.25,
-            screen_size.y * 1.25,
+            screen_size.x * 1.05,
+            screen_size.y * 1.05,
         ))
     }
 
