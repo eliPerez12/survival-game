@@ -63,6 +63,7 @@ pub struct ColliderArgs {
     pub restitution: f32,
     pub friction: f32,
     pub user_data: u128,
+    pub sensor: bool,
 }
 
 impl ColliderArgs {
@@ -81,6 +82,7 @@ impl ColliderArgs {
         .restitution(self.restitution)
         .density(self.density)
         .friction(self.friction)
+        .sensor(self.sensor)
         .active_events(ActiveEvents::COLLISION_EVENTS)
         .build()
     }
@@ -125,6 +127,7 @@ impl Default for ColliderArgs {
             restitution: 0.7,
             friction: 0.5,
             user_data: 0,
+            sensor: false,
         }
     }
 }

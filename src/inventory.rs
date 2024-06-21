@@ -1,7 +1,50 @@
 use raylib::prelude::*;
 use std::collections::HashMap;
 
-use crate::{assets::Assets, Player};
+use crate::{assets::Assets, lighting_renderer::LightingRenderer, GameWorld, ImprovedCamera, Player};
+
+pub struct GroundItem {
+    item: Item,
+    pos: Vector2,
+}
+
+impl GroundItem {
+    pub fn render(
+        &self,
+        d: &mut RaylibDrawHandle,
+        camera: &Camera2D,
+        assets: &Assets,
+        lighting_renderer: &mut LightingRenderer,
+        thread: &RaylibThread,
+    ) {
+        let screen_pos = camera.to_screen(self.pos);
+        let texture = assets.get_texture(&self.item.get_asset_name());
+        let size = self.item.get_inventory_size();
+        let size = (
+            size.0 as f32 * 1.0 * camera.zoom,
+            size.1 as f32 * 1.0 * camera.zoom,
+        );
+        let mut d = d.begin_texture_mode(thread, &mut lighting_renderer.target);
+        d.draw_texture_pro(
+            texture,
+            Rectangle {
+                x: 0.0,
+                y: 0.0,
+                width: texture.width as f32,
+                height: texture.height as f32,
+            },
+            Rectangle {
+                x: screen_pos.x - size.0 / 2.0,
+                y: screen_pos.y - size.1 / 2.0,
+                width: size.0,
+                height: size.1,
+            },
+            Vector2::zero(),
+            0.0,
+            Color::WHITE,
+        );
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct InventoryItem {
@@ -21,15 +64,19 @@ impl Item {
         InventoryItem {
             rotated,
             size: self.get_inventory_size(),
-            item: self
+            item: self,
         }
+    }
+
+    pub fn as_ground_item(self, pos: Vector2) -> GroundItem {
+        GroundItem { pos, item: self }
     }
 
     pub fn get_inventory_size(&self) -> (u32, u32) {
         match self {
-            Item::Rifle => (4,2),
-            Item::Pistol => (2,1),
-            Item::MedKit => (2,2)
+            Item::Rifle => (4, 2),
+            Item::Pistol => (2, 1),
+            Item::MedKit => (2, 2),
         }
     }
 
@@ -48,7 +95,9 @@ pub struct Inventory {
 
 impl InventoryItem {
     fn get_rotation_offset(&self, scale: f32) -> f32 {
-        (self.size.0 as f32 * Inventory::GRID_SPACING - 1.0) / 2.0 * scale - 2.5
+        (self.size.0 as f32 * Inventory::GRID_SPACING - 1.0) / (self.size.0 / self.size.1) as f32
+            * scale
+            - 2.5
     }
 
     fn rotate_back(&self, rect: &Rectangle, scale: f32) -> Rectangle {
@@ -78,7 +127,10 @@ impl Inventory {
             0.0
         };
         let (x, y) = (
-            inventory_top_left.x + (grid_pos.0 as f32 * Self::GRID_SPACING * scale) + (4.0 * scale) + rotation_offset,
+            inventory_top_left.x
+                + (grid_pos.0 as f32 * Self::GRID_SPACING * scale)
+                + (4.0 * scale)
+                + rotation_offset,
             inventory_top_left.y + (grid_pos.1 as f32 * Self::GRID_SPACING * scale) + (4.0 * scale),
         );
         Rectangle {
@@ -107,22 +159,23 @@ impl Inventory {
         None
     }
 
-    pub fn render(&mut self, d: &mut RaylibDrawHandle, player: &Player, assets: &Assets) {
+    pub fn render(&mut self, d: &mut RaylibDrawHandle, player: &Player, assets: &Assets, game_world: &mut GameWorld, player_pos: Vector2) {
         if player.inventory_open {
-            let screen_size = Vector2::new(d.get_screen_width() as f32, d.get_screen_height() as f32);
+            let screen_size =
+                Vector2::new(d.get_screen_width() as f32, d.get_screen_height() as f32);
             let texture = assets.get_texture("inventory.png");
             let texture_size = Vector2::new(texture.width() as f32, texture.height() as f32);
             let scale = 7.0;
             let inventory_top_left = Vector2::new(screen_size.x / 2.0, screen_size.y / 2.0)
                 - Vector2::new(texture_size.x / 2.0 * scale, texture_size.y / 2.0 * scale);
-            
+
             self.draw_background(d, screen_size);
             self.draw_inventory_slots(d, texture, texture_size, scale, inventory_top_left);
 
             self.draw_items(d, assets, scale, inventory_top_left);
             self.draw_selected_item(d, scale, inventory_top_left);
-            
-            let offset = self.handle_item_selection(d, scale, inventory_top_left, assets);
+
+            let offset = self.handle_item_selection(d, scale, inventory_top_left, assets, game_world, player_pos);
             if let Some(item) = &mut self.selected_item {
                 item.2 = offset;
             }
@@ -130,7 +183,13 @@ impl Inventory {
     }
 
     fn draw_background(&self, d: &mut RaylibDrawHandle, screen_size: Vector2) {
-        d.draw_rectangle(0, 0, screen_size.x as i32, screen_size.y as i32, Color::new(0, 0, 0, 100));
+        d.draw_rectangle(
+            0,
+            0,
+            screen_size.x as i32,
+            screen_size.y as i32,
+            Color::new(0, 0, 0, 100),
+        );
     }
 
     fn draw_inventory_slots(
@@ -168,7 +227,6 @@ impl Inventory {
         scale: f32,
         inventory_top_left: Vector2,
     ) {
-        
         for (grid_pos, item) in &self.items {
             let texture = assets.get_texture(&item.item.get_asset_name());
             let dest_rect = self.get_item_rect(grid_pos, scale, inventory_top_left);
@@ -199,7 +257,12 @@ impl Inventory {
             let item = self.items.get(&item.0).unwrap();
             let rotation = if item.rotated { 90.0 } else { 0.0 };
             dest_rect.width += 0.01; // correcting for rounding
-            d.draw_rectangle_pro(dest_rect, Vector2::zero(), rotation, Color::new(255, 255, 255, 140));
+            d.draw_rectangle_pro(
+                dest_rect,
+                Vector2::zero(),
+                rotation,
+                Color::new(255, 255, 255, 140),
+            );
         }
     }
 
@@ -208,7 +271,9 @@ impl Inventory {
         d: &mut RaylibDrawHandle,
         scale: f32,
         inventory_top_left: Vector2,
-        assets: &Assets
+        assets: &Assets,
+        game_world: &mut GameWorld,
+        player_pos: Vector2,
     ) -> Vector2 {
         let mut new_mouse_offset = Vector2::zero();
         if d.is_key_pressed(KeyboardKey::KEY_R) {
@@ -220,7 +285,9 @@ impl Inventory {
             }
         }
         if self.selected_item.is_none() {
-            if let Some((grid_pos, item)) = self.get_hovered_rect(scale, inventory_top_left, d.get_mouse_position()) {
+            if let Some((grid_pos, item)) =
+                self.get_hovered_rect(scale, inventory_top_left, d.get_mouse_position())
+            {
                 let mut rect = self.get_item_rect(grid_pos, scale, inventory_top_left);
                 if item.rotated {
                     rect = item.rotate_back(&rect, scale);
@@ -235,22 +302,27 @@ impl Inventory {
                 }
             }
         } else if !d.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) {
-            self.place_selected_item(scale);
+            self.place_selected_item(scale, game_world, player_pos);
         } else if let Some((grid_pos, selected_item, mouse_offset)) = &self.selected_item {
             new_mouse_offset += *mouse_offset + d.get_mouse_delta();
-            self.draw_moving_item(d, grid_pos, selected_item, scale, inventory_top_left, new_mouse_offset, assets);
+            self.draw_moving_item(
+                d,
+                grid_pos,
+                selected_item,
+                scale,
+                inventory_top_left,
+                new_mouse_offset,
+                assets,
+            );
         }
         new_mouse_offset
     }
 
-    fn place_selected_item(
-        &mut self,
-        scale: f32,
-    ) {
+    fn place_selected_item(&mut self, scale: f32, game_world: &mut GameWorld, player_pos: Vector2) {
         if let Some((grid_pos, selected_item, offset)) = &self.selected_item {
             let new_grid = (
                 (grid_pos.0 as f32 + (offset.x / Self::GRID_SPACING / scale)).round() as i32,
-                (grid_pos.1 as f32 + (offset.y / Self::GRID_SPACING / scale)).round() as i32
+                (grid_pos.1 as f32 + (offset.y / Self::GRID_SPACING / scale)).round() as i32,
             );
             let item_size = if selected_item.rotated {
                 (selected_item.size.1, selected_item.size.0)
@@ -264,11 +336,15 @@ impl Inventory {
             {
                 self.items.remove(grid_pos);
                 self.items.insert(new_grid, selected_item.clone());
+            } else {
+                game_world.ground_items.push(selected_item.item.clone().as_ground_item(player_pos));
+                self.items.remove(grid_pos);
             }
         }
         self.selected_item = None;
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn draw_moving_item(
         &self,
         d: &mut RaylibDrawHandle,
@@ -312,4 +388,3 @@ impl Inventory {
         );
     }
 }
-

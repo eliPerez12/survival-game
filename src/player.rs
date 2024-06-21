@@ -210,7 +210,7 @@ impl Player {
                 && dbg!(other_collider_speed) > player_deflection_level
             {
                 let bullet_damage =
-                    (other_collider_speed / 2.0 - player_deflection_level).clamp(0.0, 25.0);
+                    (other_collider_speed / 1.0 - player_deflection_level).clamp(0.0, 25.0);
                 self.health -= dbg!(bullet_damage);
                 bullet = Some((
                     WorldColliderHandle {
@@ -238,14 +238,14 @@ impl Player {
         bullets: &mut Vec<WorldColliderHandle>,
         aimed_at: Vector2,
     ) {
-        let accuracy = 13.0
+        let accuracy = 50.0
             / (self.collider.get_linvel(collision_world).length() / Self::WALKING_SPEED * 2.0)
                 .max(1.0);
-        let bullet_speed = 150.0;
+        let bullet_speed = 80.0;
         let max_angle = std::f32::consts::PI / 2.0 / accuracy;
         let random_accuracy_angle = rand::thread_rng().gen_range(-max_angle..max_angle);
         if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT)
-            && self.time_since_shot > 0.05
+            && self.time_since_shot > 0.1
             && !self.inventory_open
         {
             self.time_since_shot = 0.0;
@@ -263,6 +263,7 @@ impl Player {
                     restitution: 0.1,
                     friction: 0.7,
                     user_data: ColliderUserData::BULLET,
+                    sensor: false,
                 },
                 ShapeArgs::Ball {
                     radius: bullet_radius,

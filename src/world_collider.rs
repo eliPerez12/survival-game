@@ -8,6 +8,7 @@ use crate::draw_collider::*;
 use crate::traits::*;
 use crate::CollisionWorld;
 use crate::RapierCollisionWorld;
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct WorldColliderHandle {
     pub rigid_body_handle: RigidBodyHandle,

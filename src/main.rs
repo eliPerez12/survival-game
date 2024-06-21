@@ -59,18 +59,19 @@ fn main() {
         items: HashMap::new(),
         selected_item: None,
     };
-    inventory.items.insert(
-        (0, 0),
-        Item::Rifle.as_inventory_item(false),
-    );
-    inventory.items.insert(
-        (4, 0),
-        Item::Pistol.as_inventory_item(true),
-    );
-    inventory.items.insert(
-        (6, 0),
-        Item::MedKit.as_inventory_item(false),
-    );
+    inventory
+        .items
+        .insert((0, 0), Item::Rifle.as_inventory_item(false));
+    inventory
+        .items
+        .insert((4, 0), Item::Pistol.as_inventory_item(true));
+    inventory
+        .items
+        .insert((6, 0), Item::MedKit.as_inventory_item(false));
+
+    game_world
+        .ground_items
+        .push(Item::MedKit.as_ground_item(Vector2::new(0.0, 0.0)));
 
     spawn_debug_colldier_world(&mut debug_colliders, &mut collision_world);
 
@@ -171,7 +172,7 @@ fn main() {
         sh.draw_texture(&mut lighting_renderer.target, 0, 0, Color::WHITE);
         drop(sh);
         // UI
-        inventory.render(&mut d, &player, &assets);
+        inventory.render(&mut d, &player, &assets, &mut game_world, player.collider.get_pos(&collision_world));
         debugger.add(format!("{:?}", inventory.selected_item));
         debugger.draw(&mut d);
     }

@@ -1,6 +1,6 @@
 use crate::{
     collision_world::*, lighting::LightEngine, lighting_renderer::LightingRenderer, traits::*,
-    world_collider::WorldColliderHandle, Assets, Corpse, Player,
+    world_collider::WorldColliderHandle, Assets, Corpse, GroundItem, Item, Player,
 };
 use rand::Rng;
 use raylib::prelude::*;
@@ -9,6 +9,7 @@ pub struct GameWorld {
     pub bullets: Vec<WorldColliderHandle>,
     pub dummies: Vec<Player>,
     pub corpses: Vec<Corpse>,
+    pub ground_items: Vec<GroundItem>,
 }
 
 impl GameWorld {
@@ -17,6 +18,7 @@ impl GameWorld {
             bullets: vec![],
             dummies: vec![],
             corpses: vec![],
+            ground_items: vec![],
         }
     }
     //TODO: Fix too many args
@@ -39,6 +41,7 @@ impl GameWorld {
             &mut lighting_renderer.target,
         );
         self.render_corpses(camera, d, assets, thread, &mut lighting_renderer.target);
+        self.render_ground_items(d, camera, assets, lighting_renderer, thread);
         self.render_dummies(
             player,
             camera,
@@ -98,6 +101,19 @@ impl GameWorld {
                 true
             }
         });
+    }
+
+    fn render_ground_items(
+        &self,
+        d: &mut RaylibDrawHandle,
+        camera: &Camera2D,
+        assets: &Assets,
+        lighting_renderer: &mut LightingRenderer,
+        thread: &RaylibThread,
+    ) {
+        for item in &self.ground_items {
+            item.render(d, camera, assets, lighting_renderer, thread);
+        }
     }
 
     fn render_bullets(
@@ -235,6 +251,7 @@ pub fn spawn_debug_colldier_world(
                 restitution: 0.5,
                 friction: 0.5,
                 user_data: ColliderUserData::WALL,
+                sensor: false,
             },
             ShapeArgs::Cuboid {
                 half_extents: Vector2::new(size_x, size_y),
