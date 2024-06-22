@@ -186,7 +186,7 @@ impl CollisionWorld {
 }
 
 impl CollisionWorld {
-    const FIXED_TIME_STEP: f32 = 1.0 / 100.0;
+    const FIXED_TIME_STEP: f32 = 1.0 / 1000.0;
     const MAX_FRAME_TIME: f32 = 0.25; // To prevent spiral of death in case of a long frame
 
     pub fn step(&mut self, rl: &RaylibHandle) {

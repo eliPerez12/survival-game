@@ -77,9 +77,9 @@ pub struct Player {
 }
 
 impl Player {
-    const WALKING_SPEED: f32 = 3.5;
-    const SPRINTING_SPEED: f32 = 7.5;
-    const WALKING_ACCELERATION: f32 = 10.0;
+    const WALKING_SPEED: f32 = 4.5;
+    const SPRINTING_SPEED: f32 = 8.5;
+    const WALKING_ACCELERATION: f32 = 20.0;
     //const WALKING_DEACCELERATION: f32 = 18.0;
 
     pub fn new(collision_world: &mut CollisionWorld, light_engine: &mut LightEngine) -> Self {
@@ -184,7 +184,7 @@ impl Player {
         bullets: &mut Vec<WorldColliderHandle>,
     ) {
         let mut bullet = None;
-        let player_deflection_level = 30.0;
+        let player_deflection_level = 60.0;
         for collision in collision_world
             .rapier
             .narrow_phase
@@ -241,7 +241,7 @@ impl Player {
         let accuracy = 50.0
             / (self.collider.get_linvel(collision_world).length() / Self::WALKING_SPEED * 2.0)
                 .max(1.0);
-        let bullet_speed = 80.0;
+        let bullet_speed = 160.0;
         let max_angle = std::f32::consts::PI / 2.0 / accuracy;
         let random_accuracy_angle = rand::thread_rng().gen_range(-max_angle..max_angle);
         if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT)
