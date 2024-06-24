@@ -61,17 +61,17 @@ fn main() {
     };
     inventory
         .items
-        .insert((0, 0), Item::Rifle.as_inventory_item(false));
+        .insert((0, 0), Item::Rifle.to_inventory_item(false));
     inventory
         .items
-        .insert((4, 0), Item::Pistol.as_inventory_item(true));
+        .insert((4, 0), Item::Pistol.to_inventory_item(true));
     inventory
         .items
-        .insert((6, 0), Item::MedKit.as_inventory_item(false));
+        .insert((6, 0), Item::MedKit.to_inventory_item(false));
 
     game_world
         .ground_items
-        .push(Item::MedKit.as_ground_item(Vector2::new(0.0, 0.0)));
+        .push(Item::MedKit.to_ground_item(Vector2::new(0.0, 0.0)));
 
     spawn_debug_colldier_world(&mut debug_colliders, &mut collision_world);
 
@@ -81,9 +81,8 @@ fn main() {
          */
         let mouse_pos = rl.get_mouse_position();
         debugger.update(&mut rl);
-        player.apply_collision_damage(&mut collision_world, &mut game_world.bullets);
+        //player.apply_collision_damage(&mut collision_world, &mut game_world.bullets);
         game_world.handle_corpses(&rl);
-        game_world.handle_dummies(&mut rl, &player, &mut collision_world, &mut light_engine);
         player.handle_controls(&rl, &camera, &mut collision_world);
         player.handle_shooting(
             &mut rl,
@@ -105,7 +104,7 @@ fn main() {
             &mut light_engine,
         );
         game_world.handle_bullet_physics(&rl, &mut collision_world);
-        collision_world.step(&rl);
+        collision_world.step(&rl, &mut player, &mut game_world, &mut light_engine);
 
         /*
          * Drawing

@@ -60,23 +60,23 @@ pub enum Item {
     MedKit,
 }
 impl Item {
-    pub fn as_inventory_item(self, rotated: bool) -> InventoryItem {
+    pub fn to_inventory_item(&self, rotated: bool) -> InventoryItem {
         InventoryItem {
             rotated,
             size: self.get_inventory_size(),
-            item: self,
+            item: self.clone(),
         }
     }
 
-    pub fn as_ground_item(self, pos: Vector2) -> GroundItem {
-        GroundItem { pos, item: self }
+    pub fn to_ground_item(&self, pos: Vector2) -> GroundItem {
+        GroundItem { pos, item: self.clone() }
     }
 
     pub fn get_inventory_size(&self) -> (u32, u32) {
         match self {
             Item::Rifle => (4, 2),
             Item::Pistol => (2, 1),
-            Item::MedKit => (2, 2),
+            Item::MedKit => (3, 2),
         }
     }
 
@@ -337,7 +337,7 @@ impl Inventory {
                 self.items.remove(grid_pos);
                 self.items.insert(new_grid, selected_item.clone());
             } else {
-                game_world.ground_items.push(selected_item.item.clone().as_ground_item(player_pos));
+                game_world.ground_items.push(selected_item.item.clone().to_ground_item(player_pos));
                 self.items.remove(grid_pos);
             }
         }

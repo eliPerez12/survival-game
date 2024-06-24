@@ -59,26 +59,6 @@ impl GameWorld {
         }
     }
 
-    pub fn handle_dummies(
-        &mut self,
-        rl: &mut RaylibHandle,
-        player: &Player,
-        collision_world: &mut CollisionWorld,
-        light_engine: &mut LightEngine,
-    ) {
-        for dummy in &mut self.dummies {
-            dummy.apply_collision_damage(collision_world, &mut self.bullets);
-            dummy.handle_movement(rl, collision_world, &mut Vector2::zero());
-            dummy.aim_at(player.collider.get_pos(collision_world), collision_world);
-            if dummy.health <= 0.0 {
-                self.corpses.push(dummy.get_corpse(collision_world));
-                collision_world.delete_collider(dummy.collider.clone());
-                light_engine.remove_light(&dummy.player_light);
-            }
-        }
-        self.dummies.retain(|dummy| dummy.health > 0.0)
-    }
-
     pub fn handle_bullet_physics(
         &mut self,
         rl: &RaylibHandle,

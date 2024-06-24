@@ -178,59 +178,6 @@ impl Player {
             .set_color(Vector4::new(1.0, 1.0, 1.0, 0.15));
     }
 
-    pub fn apply_collision_damage(
-        &mut self,
-        collision_world: &mut CollisionWorld,
-        bullets: &mut Vec<WorldColliderHandle>,
-    ) {
-        let mut bullet = None;
-        let player_deflection_level = 60.0;
-        for collision in collision_world
-            .rapier
-            .narrow_phase
-            .contact_pairs_with(self.collider.collider_handle)
-        {
-            let other_collider_handle = if self.collider.collider_handle == collision.collider1 {
-                collision.collider2
-            } else {
-                collision.collider1
-            };
-            let other_collider = &collision_world
-                .rapier
-                .collider_set
-                .get(other_collider_handle);
-            if other_collider.is_none() {
-                break;
-            }
-            let other_collider = other_collider.unwrap();
-            let other_rigid_body_handle = other_collider.parent().unwrap();
-            let other_rigid_body = &collision_world.rapier.rigid_body_set[other_rigid_body_handle];
-            let other_collider_speed = other_rigid_body.linvel().to_raylib_vector2().length();
-            if other_rigid_body.user_data == ColliderUserData::BULLET
-                && dbg!(other_collider_speed) > player_deflection_level
-            {
-                let bullet_damage =
-                    (other_collider_speed / 1.0 - player_deflection_level).clamp(0.0, 25.0);
-                self.health -= dbg!(bullet_damage);
-                bullet = Some((
-                    WorldColliderHandle {
-                        rigid_body_handle: other_rigid_body_handle,
-                        collider_handle: other_collider_handle,
-                    },
-                    other_rigid_body.linvel().to_raylib_vector2().normalized()
-                        * other_collider_speed
-                        * other_collider.mass(),
-                ));
-                break;
-            }
-        }
-        if let Some((bullet, force)) = bullet {
-            bullets.retain(|b| *b != bullet);
-            collision_world.delete_collider(bullet);
-            self.collider.apply_impulse(force, collision_world);
-        }
-    }
-
     pub fn handle_shooting(
         &mut self,
         rl: &mut RaylibHandle,
@@ -259,7 +206,7 @@ impl Player {
                     user_data: ColliderUserData::BULLET,
                 },
                 ColliderArgs {
-                    density: 5.5,
+                    density: 1.5,
                     restitution: 0.1,
                     friction: 0.7,
                     user_data: ColliderUserData::BULLET,

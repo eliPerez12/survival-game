@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 
+use crate::lighting::LightEngine;
 use crate::world_collider::WorldColliderHandle;
+use crate::GameWorld;
+use crate::Player;
 use rapier2d::prelude::*;
 use raylib::prelude::*;
 
@@ -186,10 +189,64 @@ impl CollisionWorld {
 }
 
 impl CollisionWorld {
-    const FIXED_TIME_STEP: f32 = 1.0 / 1000.0;
+    const FIXED_TIME_STEP: f32 = 1.0 / 200.0;
     const MAX_FRAME_TIME: f32 = 0.25; // To prevent spiral of death in case of a long frame
 
-    pub fn step(&mut self, rl: &RaylibHandle) {
+    pub fn apply_collision_damage(
+        &mut self,
+        player: &mut Player,
+        bullets: &mut Vec<WorldColliderHandle>,
+    ) {
+        let mut bullet = None;
+        let player_deflection_level = 60.0;
+        for collision in self
+            .rapier
+            .narrow_phase
+            .contact_pairs_with(player.collider.collider_handle)
+        {
+            let other_collider_handle = if player.collider.collider_handle == collision.collider1 {
+                collision.collider2
+            } else {
+                collision.collider1
+            };
+            let other_collider = &self
+                .rapier
+                .collider_set
+                .get(other_collider_handle);
+            if other_collider.is_none() {
+                break;
+            }
+            let other_collider = other_collider.unwrap();
+            let other_rigid_body_handle = other_collider.parent().unwrap();
+            let other_rigid_body = &self.rapier.rigid_body_set[other_rigid_body_handle];
+            let other_collider_speed = other_rigid_body.linvel().to_raylib_vector2().length();
+            if other_rigid_body.user_data == ColliderUserData::BULLET
+                && dbg!(other_collider_speed) > player_deflection_level
+            {
+                let bullet_damage =
+                    (other_collider_speed / 1.0 - player_deflection_level).clamp(0.0, 25.0);
+                player.health -= dbg!(bullet_damage);
+                bullet = Some((
+                    WorldColliderHandle {
+                        rigid_body_handle: other_rigid_body_handle,
+                        collider_handle: other_collider_handle,
+                    },
+                    other_rigid_body.linvel().to_raylib_vector2().normalized()
+                        * other_collider_speed
+                        * other_collider.mass(),
+                ));
+                break;
+            }
+        }
+        if let Some((bullet, force)) = bullet {
+            bullets.retain(|b| *b != bullet);
+            self.delete_collider(bullet);
+            player.collider.apply_impulse(force, self);
+        }
+    }
+
+
+    pub fn step(&mut self, rl: &RaylibHandle, player: &mut Player, game_world: &mut GameWorld, light_engine: &mut LightEngine) {
         // Get the elapsed time for the current frame
         let frame_time = rl.get_frame_time().min(Self::MAX_FRAME_TIME);
 
@@ -198,6 +255,18 @@ impl CollisionWorld {
 
         // Perform physics updates in fixed time steps
         while self.rapier.accumulated_time >= Self::FIXED_TIME_STEP {
+            self.apply_collision_damage(player, &mut game_world.bullets);
+            for dummy in &mut game_world.dummies {
+                self.apply_collision_damage(dummy, &mut game_world.bullets);
+                dummy.handle_movement(rl, self, &mut Vector2::zero());
+                dummy.aim_at(player.collider.get_pos(self), self);
+                if dummy.health <= 0.0 {
+                    game_world.corpses.push(dummy.get_corpse(self));
+                    self.delete_collider(dummy.collider.clone());
+                    light_engine.remove_light(&dummy.player_light);
+                }
+            }
+            game_world.dummies.retain(|dummy| dummy.health > 0.0);
             self.rapier.integration_parameters.dt = Self::FIXED_TIME_STEP;
             self.rapier.step();
             self.rapier.accumulated_time -= Self::FIXED_TIME_STEP;
