@@ -235,7 +235,7 @@ impl CollisionWorld {
                         * other_collider_speed
                         * other_collider.mass(),
                 ));
-                break;
+                break; 
             }
         }
         if let Some((bullet, force)) = bullet {
