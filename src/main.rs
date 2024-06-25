@@ -55,23 +55,7 @@ fn main() {
         .unwrap();
 
     let map = GameMap::load_map("maps/map.tmx");
-    let mut inventory = Inventory {
-        items: HashMap::new(),
-        selected_item: None,
-    };
-    inventory
-        .items
-        .insert((0, 0), Item::Rifle.to_inventory_item(false));
-    inventory
-        .items
-        .insert((4, 0), Item::Pistol.to_inventory_item(true));
-    inventory
-        .items
-        .insert((6, 0), Item::MedKit.to_inventory_item(false));
-
-    game_world
-        .ground_items
-        .push(Item::MedKit.to_ground_item(Vector2::new(0.0, 0.0)));
+    let mut inventory = Inventory::new();
 
     spawn_debug_colldier_world(&mut debug_colliders, &mut collision_world);
 
@@ -83,7 +67,7 @@ fn main() {
         debugger.update(&mut rl);
         //player.apply_collision_damage(&mut collision_world, &mut game_world.bullets);
         game_world.handle_corpses(&rl);
-        player.handle_controls(&rl, &camera, &mut collision_world);
+        player.handle_controls(&rl, &mut camera, &mut collision_world);
         player.handle_shooting(
             &mut rl,
             &mut collision_world,
@@ -91,7 +75,6 @@ fn main() {
             camera.to_world(mouse_pos),
         );
         player.update_player_light(&mut light_engine, &mut collision_world);
-        camera.handle_camera_controls(&rl);
         camera.track(
             player.collider.get_center_of_mass(&collision_world),
             Vector2::new(rl.get_screen_width() as f32, rl.get_screen_height() as f32),
@@ -103,6 +86,10 @@ fn main() {
             &mut game_world,
             &mut light_engine,
         );
+        if player.inventory_open {
+            inventory.update(&mut rl);
+        }
+
         game_world.handle_bullet_physics(&rl, &mut collision_world);
         collision_world.step(&rl, &mut player, &mut game_world, &mut light_engine);
 
@@ -153,7 +140,6 @@ fn main() {
             &thread,
             &mut lighting_renderer.target,
         );
-
         // Debugger
         debugger.add(format!("Game FPS: {}", d.get_fps()));
         debugger.add(format!(
@@ -171,8 +157,9 @@ fn main() {
         sh.draw_texture(&mut lighting_renderer.target, 0, 0, Color::WHITE);
         drop(sh);
         // UI
-        inventory.render(&mut d, &player, &assets, &mut game_world, player.collider.get_pos(&collision_world));
-        debugger.add(format!("{:?}", inventory.selected_item));
+        if player.inventory_open {
+            inventory.render(&mut d, &assets);
+        }
         debugger.draw(&mut d);
     }
 }

@@ -121,11 +121,20 @@ impl Player {
     pub fn handle_controls(
         &mut self,
         rl: &RaylibHandle,
-        camera: &Camera2D,
+        camera: &mut Camera2D,
         collision_world: &mut CollisionWorld,
     ) {
         let mut movement_vector = Vector2::new(0.0, 0.0);
         if !self.inventory_open {
+            let screen_size =
+                Vector2::new(rl.get_screen_width() as f32, rl.get_screen_height() as f32);
+            let mouse_wheel_move = rl.get_mouse_wheel_move();
+
+            if mouse_wheel_move != 0.0 {
+                let old_world_pos = camera.get_world_pos(camera.offset, screen_size);
+                camera.zoom *= 1.0 + rl.get_mouse_wheel_move() / 20.0;
+                camera.track(old_world_pos, screen_size);
+            }
             if rl.is_key_down(KeyboardKey::KEY_W) {
                 movement_vector.y -= 1.0;
             }
@@ -143,6 +152,7 @@ impl Player {
         if rl.is_key_pressed(KeyboardKey::KEY_I) {
             self.inventory_open = !self.inventory_open;
         }
+
         self.handle_movement(rl, collision_world, &mut movement_vector);
     }
 

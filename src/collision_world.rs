@@ -209,10 +209,7 @@ impl CollisionWorld {
             } else {
                 collision.collider1
             };
-            let other_collider = &self
-                .rapier
-                .collider_set
-                .get(other_collider_handle);
+            let other_collider = &self.rapier.collider_set.get(other_collider_handle);
             if other_collider.is_none() {
                 break;
             }
@@ -235,7 +232,7 @@ impl CollisionWorld {
                         * other_collider_speed
                         * other_collider.mass(),
                 ));
-                break; 
+                break;
             }
         }
         if let Some((bullet, force)) = bullet {
@@ -245,8 +242,13 @@ impl CollisionWorld {
         }
     }
 
-
-    pub fn step(&mut self, rl: &RaylibHandle, player: &mut Player, game_world: &mut GameWorld, light_engine: &mut LightEngine) {
+    pub fn step(
+        &mut self,
+        rl: &RaylibHandle,
+        player: &mut Player,
+        game_world: &mut GameWorld,
+        light_engine: &mut LightEngine,
+    ) {
         // Get the elapsed time for the current frame
         let frame_time = rl.get_frame_time().min(Self::MAX_FRAME_TIME);
 
