@@ -1,5 +1,5 @@
 use crate::{
-    collision_world::*, lighting::LightEngine, lighting_renderer::LightingRenderer, traits::*,
+    collision_world::*, lighting_renderer::LightingRenderer, traits::*,
     world_collider::WorldColliderHandle, Assets, Corpse, Player,
 };
 use rand::Rng;
