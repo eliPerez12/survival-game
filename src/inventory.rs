@@ -17,22 +17,32 @@ const SLOT_PARTS: [(f32, f32, f32, f32); 9] = [
     (0.0, 20.0, 4.0, 4.0),  // SLOT_BOTTOM_LEFT_CORNER
 ];
 
-pub struct Inventory {}
+pub struct Inventory {
+    inventory_slots: Vec<(Vector2, (u32, u32))>,
+    scale: f32,
+}
 
 impl Inventory {
     pub fn new() -> Self {
-        Inventory {}
+        Inventory {
+            scale: 3.0,
+            inventory_slots: vec![
+                (Vector2::new(0.0, 0.0), (8, 16)),
+                (Vector2::new(500.0, 0.0), (8, 16)),
+            ]
+        }
     }
 
-    pub fn update(&mut self, _rl: &mut RaylibHandle) {}
+    pub fn update(&mut self, rl: &mut RaylibHandle) {
+        if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) {
+
+        }
+    }
+
 
     pub fn render(&self, d: &mut RaylibDrawHandle, assets: &Assets) {
         let slot_texture = assets.get_texture("slot.png");
-        let scale = 3.5;
-        let inventory_size = (8, 12);
-        let inventory_offset = Vector2::new(0.0, 0.0);
-        let inventory_tint = Color::new(255, 255, 255, 230);
-
+        let inventory_tint = Color::new(255, 255, 255, 220);
         let draw_part = |d: &mut RaylibDrawHandle, part: (f32, f32, f32, f32), dest: Rectangle| {
             d.draw_texture_pro(
                 slot_texture,
@@ -44,93 +54,96 @@ impl Inventory {
             );
         };
 
-        // Drawing inner slots
-        for x in 0..inventory_size.0 {
-            for y in 0..inventory_size.1 {
-                let dest = Rectangle::new(
-                    x as f32 * 16.0 * scale + 4.0 * scale + inventory_offset.x,
-                    y as f32 * 16.0 * scale + 4.0 * scale + inventory_offset.y,
-                    16.0 * scale,
-                    16.0 * scale,
-                );
-                draw_part(d, SLOT_PARTS[0], dest);
+        
+        for inventory in &self.inventory_slots {
+            // Drawing inner slots
+            for x in 0..inventory.1.0 {
+                for y in 0..inventory.1.1 {
+                    let dest = Rectangle::new(
+                        x as f32 * 16.0 * self.scale + 4.0 * self.scale + inventory.0.x,
+                        y as f32 * 16.0 * self.scale + 4.0 * self.scale + inventory.0.y,
+                        16.0 * self.scale,
+                        16.0 * self.scale,
+                    );
+                    draw_part(d, SLOT_PARTS[0], dest);
+                }
             }
-        }
 
-        // Drawing borders and corners
-        for x in 0..inventory_size.0 {
-            draw_part(
-                d,
-                SLOT_PARTS[1],
-                Rectangle::new(
-                    x as f32 * 16.0 * scale + 4.0 * scale + inventory_offset.x,
-                    inventory_offset.y,
-                    16.0 * scale,
-                    4.0 * scale,
-                ),
-            );
-            draw_part(
-                d,
-                SLOT_PARTS[2],
-                Rectangle::new(
-                    x as f32 * 16.0 * scale + 4.0 * scale + inventory_offset.x,
-                    inventory_size.1 as f32 * 16.0 * scale + 4.0 * scale + inventory_offset.y,
-                    16.0 * scale,
-                    4.0 * scale,
-                ),
-            );
-        }
+            // Drawing borders and corners
+            for x in 0..inventory.1.0 {
+                draw_part(
+                    d,
+                    SLOT_PARTS[1],
+                    Rectangle::new(
+                        x as f32 * 16.0 * self.scale + 4.0 * self.scale + inventory.0.x,
+                        inventory.0.y,
+                        16.0 * self.scale,
+                        4.0 * self.scale,
+                    ),
+                );
+                draw_part(
+                    d,
+                    SLOT_PARTS[2],
+                    Rectangle::new(
+                        x as f32 * 16.0 * self.scale + 4.0 * self.scale + inventory.0.x,
+                        inventory.1.1 as f32 * 16.0 * self.scale + 4.0 * self.scale + inventory.0.y,
+                        16.0 * self.scale,
+                        4.0 * self.scale,
+                    ),
+                );
+            }
 
-        for y in 0..inventory_size.1 {
-            draw_part(
-                d,
-                SLOT_PARTS[3],
-                Rectangle::new(
-                    inventory_offset.x,
-                    y as f32 * 16.0 * scale + 4.0 * scale + inventory_offset.y,
-                    4.0 * scale,
-                    16.0 * scale,
-                ),
-            );
-            draw_part(
-                d,
-                SLOT_PARTS[4],
-                Rectangle::new(
-                    inventory_size.0 as f32 * 16.0 * scale + 4.0 * scale + inventory_offset.x,
-                    y as f32 * 16.0 * scale + 4.0 * scale + inventory_offset.y,
-                    4.0 * scale,
-                    16.0 * scale,
-                ),
-            );
-        }
+            for y in 0..inventory.1.1 {
+                draw_part(
+                    d,
+                    SLOT_PARTS[3],
+                    Rectangle::new(
+                        inventory.0.x,
+                        y as f32 * 16.0 * self.scale + 4.0 * self.scale + inventory.0.y,
+                        4.0 * self.scale,
+                        16.0 * self.scale,
+                    ),
+                );
+                draw_part(
+                    d,
+                    SLOT_PARTS[4],
+                    Rectangle::new(
+                        inventory.1.0 as f32 * 16.0 * self.scale + 4.0 * self.scale + inventory.0.x,
+                        y as f32 * 16.0 * self.scale + 4.0 * self.scale + inventory.0.y,
+                        4.0 * self.scale,
+                        16.0 * self.scale,
+                    ),
+                );
+            }
 
-        let corners = [
-            (SLOT_PARTS[5], (0.0, 0.0)),
-            (SLOT_PARTS[6], (inventory_size.0 as f32 * 16.0 * scale + 4.0 * scale, 0.0)),
-            (
-                SLOT_PARTS[7],
+            let corners = [
+                (SLOT_PARTS[5], (0.0, 0.0)),
+                (SLOT_PARTS[6], (inventory.1.0 as f32 * 16.0 * self.scale + 4.0 * self.scale, 0.0)),
                 (
-                    inventory_size.0 as f32 * 16.0 * scale + 4.0 * scale,
-                    inventory_size.1 as f32 * 16.0 * scale + 4.0 * scale,
+                    SLOT_PARTS[7],
+                    (
+                        inventory.1.0 as f32 * 16.0 * self.scale + 4.0 * self.scale,
+                        inventory.1.1 as f32 * 16.0 * self.scale + 4.0 * self.scale,
+                    ),
                 ),
-            ),
-            (
-                SLOT_PARTS[8],
-                (0.0, inventory_size.1 as f32 * 16.0 * scale + 4.0 * scale),
-            ),
-        ];
+                (
+                    SLOT_PARTS[8],
+                    (0.0, inventory.1.1 as f32 * 16.0 * self.scale + 4.0 * self.scale),
+                ),
+            ];
 
-        for (part, (dx, dy)) in corners.iter() {
-            draw_part(
-                d,
-                *part,
-                Rectangle::new(
-                    inventory_offset.x + dx,
-                    inventory_offset.y + dy,
-                    part.2 * scale,
-                    part.3 * scale,
-                ),
-            );
-        }
+            for (part, (dx, dy)) in corners.iter() {
+                draw_part(
+                    d,
+                    *part,
+                    Rectangle::new(
+                        inventory.0.x + dx,
+                        inventory.0.y + dy,
+                        part.2 * self.scale,
+                        part.3 * self.scale,
+                    ),
+                );
+            }
+        }    
     }
 }
