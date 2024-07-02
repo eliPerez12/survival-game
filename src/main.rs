@@ -35,7 +35,10 @@ fn main() {
         .title("Physics")
         //.vsync()
         .build();
-    let mut camera = Camera2D {
+    rl.set_exit_key(None);
+    //rl.set_window_icon(Image::load_image_from_mem(".png", include_bytes!("../assets/icon/icon.png")));
+
+    let mut camera = Camera2D { 
         offset: Vector2::new(0.0, 0.0),
         zoom: 50.0,
         ..Default::default()

@@ -136,7 +136,7 @@ pub struct Inventory {
 impl Inventory {
     pub fn new() -> Self {
         Inventory {
-            scale: 3.0,
+            scale: 1.0,
             inventory_slots: vec![
                 (Vector2::new(0.0, 100.0), (4, 8)),
                 (Vector2::new(500.0, 100.0), (8, 4)),
@@ -155,26 +155,31 @@ impl Inventory {
         let background_tint = Color::new(0,0,0,100); 
         let parent_inventory_size = (2, 2);
         let font = d.get_font_default();
-
+        let font_size = 7.0;
 
         // Tint background
         d.draw_rectangle(0, 0, d.get_screen_width(), d.get_screen_height(), background_tint);
 
         for inventory in &self.inventory_slots {
+            let text = "B";
+            let text_width = d.measure_text(text, font_size as i32) as f32 * self.scale;
+            let text_height = font.base_size() as f32 * self.scale;
+            let text_rect = Rectangle::new(inventory.0.x + 2.0 * self.scale, inventory.0.y, text_width, text_height);
             d.draw_text_pro(
                 &font,
-                "Player Inventory",
-                inventory.0,
+                text,
+                Vector2::new(text_rect.x, text_rect.y),
                 Vector2::zero(),
                 0.0,
-                6.0 * self.scale,
+                font_size * self.scale,
                 1.0,
                 Color::WHITE
             ); 
-
+            d.draw_rectangle_rec(text_rect, inventory_tint);
+            
             let parent_inventory = Rectangle::new(
                 inventory.0.x,
-                inventory.0.y + font.base_size() as f32 / 1.5 * self.scale,
+                inventory.0.y + text_height,
                 (16.0 * parent_inventory_size.0 as f32 + 5.0) * self.scale,
                 (16.0 * parent_inventory_size.1 as f32) * self.scale,
             );
